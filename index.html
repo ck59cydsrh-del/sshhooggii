@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#EDEDEA">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="sshhooggii">
+<title>sshhooggii</title>
+<meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
+<link rel="stylesheet" href="style.css?v=1788617297">
+</head>
+<body>
+<div id="crt"></div>
+
+<!-- ============ はじめての説明 ============ -->
+<div id="tutorial" class="screen hidden">
+  <p class="tag" id="tut-step">01 / 06</p>
+  <h2 class="screen-title" id="tut-title"></h2>
+  <div id="tut-fig" class="tut-fig"></div>
+  <p id="tut-text" class="tut-text"></p>
+  <div class="menu">
+    <button id="tut-next" class="mi primary"><span class="mi-no">▶</span>
+      <span class="mi-body"><b>つぎへ</b></span><span class="mi-rule"></span><i>next</i></button>
+    <button id="tut-prev" class="mi"><span class="mi-no">◀</span>
+      <span class="mi-body"><b>もどる</b></span><span class="mi-rule"></span><i>back</i></button>
+    <button id="tut-skip" class="mi"><span class="mi-no">×</span>
+      <span class="mi-body"><b>とばす</b><span class="mi-sub">あとでタイトルの「あそびかた」から見られます</span></span>
+      <span class="mi-rule"></span><i>skip</i></button>
+  </div>
+</div>
+<div id="flash"></div>
+<div id="transition" class="hidden"><b id="tr-num"></b><i id="tr-label"></i></div>
+
+<!-- ============ タイトル ============ -->
+<div id="title" class="screen">
+  <h1 class="wordmark" data-word="sshhooggii"><span>sshhooggii</span></h1>
+  <p class="sub">将棋 &lt;&gt; ROGUE &lt;&gt; 0=1</p>
+
+  <p class="lead">取った駒は次の階へ持って行ける。<br>
+    敵は溜め込めない。奪うのはこちらだけ。<br>
+    手数が尽きれば階が崩れはじめる。</p>
+
+  <nav class="menu main-menu">
+    <button id="btn-solo" class="mi primary">
+      <span class="mi-no">01</span>
+      <span class="mi-body"><b>潜　る</b><span class="mi-sub">階層を降りて駒と能力を集める</span></span>
+      <span class="mi-rule"></span><i>dive</i>
+    </button>
+    <button id="btn-versus" class="mi">
+      <span class="mi-no">02</span>
+      <span class="mi-body"><b>対　戦</b><span class="mi-sub">編成を組んで2本先取</span></span>
+      <span class="mi-rule"></span><i>versus</i>
+    </button>
+    <button id="btn-presets" class="mi">
+      <span class="mi-no">03</span>
+      <span class="mi-body"><b>編　成</b><span class="mi-sub">持ち帰った編成を見る</span></span>
+      <span class="mi-rule"></span><i>units</i>
+    </button>
+    <button id="btn-howto" class="mi">
+      <span class="mi-no">04</span>
+      <span class="mi-body"><b>あそびかた</b><span class="mi-sub">図で見る手引き</span></span>
+      <span class="mi-rule"></span><i>how to</i>
+    </button>
+    <button id="btn-settings" class="mi">
+      <span class="mi-no">05</span>
+      <span class="mi-body"><b>設　定</b><span class="mi-sub">音量と演出</span></span>
+      <span class="mi-rule"></span><i>settings</i>
+    </button>
+  </nav>
+
+  <p id="best-record" class="record"></p>
+
+  <details class="rules">
+    <summary>駒の動き</summary>
+    <div class="rules-body">
+      <div id="piece-guide" class="piece-guide"></div>
+      <p class="note">緑のマスへ進めます。飛・角・香は駒に当たるまで走ります。桂だけは間の駒を飛び越えます。</p>
+    </div>
+  </details>
+</div>
+
+<!-- ============ 対戦セットアップ ============ -->
+<div id="setup" class="screen hidden">
+  <p class="tag">VERSUS</p>
+  <h2 class="screen-title">対戦</h2>
+  <div class="army" id="army-sente">
+    <div class="army-head"><span class="army-side">▲ 先手</span><select id="sel-sente"></select></div>
+    <div class="army-pieces" id="pieces-sente"></div>
+    <div class="army-abils" id="abils-sente"></div>
+    <p class="army-note" id="note-sente"></p>
+  </div>
+
+  <div class="vs-mark">対</div>
+
+  <div class="army" id="army-gote">
+    <div class="army-head"><span class="army-side">△ 後手</span><select id="sel-gote"></select></div>
+    <div class="army-pieces" id="pieces-gote"></div>
+    <div class="army-abils" id="abils-gote"></div>
+    <p class="army-note" id="note-gote"></p>
+  </div>
+
+  <div class="setup-row"><label>後手を</label>
+    <select id="sel-gote-ctrl">
+      <option value="human">人が指す(交代操作)</option>
+      <option value="cpu">CPUが指す</option>
+      <option value="net">別の端末 / 同じWi-Fi</option>
+      <option value="p2p">別の端末 / インターネット</option>
+    </select>
+  </div>
+
+  <div id="net-box" class="net-box hidden">
+    <div class="setup-row">
+      <label for="net-room">合言葉</label>
+      <input id="net-room" type="text" maxlength="8" placeholder="例: SHOGI" autocomplete="off">
+    </div>
+    <div class="setup-row">
+      <label for="net-seat">自分は</label>
+      <select id="net-seat">
+        <option value="s">▲ 先手</option>
+        <option value="g">△ 後手</option>
+      </select>
+    </div>
+    <p class="net-status" id="net-status">同じWi-Fiの2台で、同じ合言葉を入れてください。</p>
+    <p class="net-url" id="net-url"></p>
+    <p class="net-hint" id="net-hint"></p>
+  </div>
+  <p class="hint">先に2勝した方の勝ち。局ごとに先番を入れ替えます。<br>
+    開始すると、それぞれ駒10枚と能力を選ぶ編成画面に進みます。</p>
+  <div class="menu">
+    <button id="btn-setup-start" class="mi primary"><span class="mi-no">▶</span><span class="mi-body"><b>開　始</b><span class="mi-sub">編成画面に進む</span></span><span class="mi-rule"></span><i>start</i></button>
+    <button id="btn-setup-back" class="mi"><span class="mi-no">◀</span><span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+  </div>
+</div>
+
+<!-- ============ デッキ構築 ============ -->
+<div id="deck" class="screen hidden">
+  <p class="tag" id="deck-tag">DECK</p>
+  <h2 class="screen-title" id="deck-title">編成</h2>
+
+  <div class="deck-sec">
+    <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
+    <p class="hint" id="deck-piece-hint"></p>
+    <div id="deck-quick" class="deck-quick hidden">
+      <button id="btn-pc-auto" class="mini">価値の高い順に10枚</button>
+      <button id="btn-pc-clear" class="mini">全部外す</button>
+      <span id="deck-piece-value" class="deck-value"></span>
+    </div>
+    <div id="deck-pieces" class="deck-pieces"></div>
+  </div>
+
+  <div class="deck-sec">
+    <p class="deck-head"><span>能力</span><b id="deck-cost">コスト 0 / 10　枠 0 / 5</b></p>
+    <div id="deck-meter" class="deck-meter"></div>
+    <p class="hint">並2 / 希4 / 極10。潜って修得した能力は1安い。選んだものは上に並びます。</p>
+    <div id="deck-filter" class="deck-filter"></div>
+    <div id="deck-abilities" class="deck-abilities"></div>
+  </div>
+
+  <div class="menu deck-menu">
+    <button id="btn-deck-ok" class="mi primary"><span class="mi-no">▶</span><span class="mi-body"><b>決　定</b><span class="mi-sub">この編成で始める</span></span><span class="mi-rule"></span><i>confirm</i></button>
+    <button id="btn-deck-auto" class="mi"><span class="mi-no">＊</span><span class="mi-body"><b>おまかせ</b><span class="mi-sub">駒と能力をまとめて組む</span></span><span class="mi-rule"></span><i>auto</i></button>
+    <button id="btn-deck-back" class="mi"><span class="mi-no">◀</span><span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+  </div>
+</div>
+
+<!-- ============ プリセット ============ -->
+<div id="presets" class="screen hidden">
+  <p class="tag" id="presets-tag">UNITS</p>
+  <h2 class="screen-title" id="presets-title">保存した編成</h2>
+  <p class="hint" id="presets-hint"></p>
+  <div id="preset-list" class="preset-list"></div>
+  <div class="menu">
+    <button id="btn-presets-back" class="mi"><span class="mi-no">◀</span><span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+  </div>
+</div>
+
+<!-- ============ ゲーム ============ -->
+<div id="game" class="screen hidden">
+  <header class="hud">
+    <button id="btn-quit" class="icon-btn">◀</button>
+    <div class="hud-floor">
+      <canvas id="sigil" class="sigil" width="24" height="24"></canvas>
+      <div class="hud-floor-text">
+        <span id="floor-label">FLOOR 01</span>
+        <span id="turn-label">YOUR MOVE</span>
+      </div>
+    </div>
+    <div class="hud-right">
+      <span id="score" class="score">0</span>
+      <button id="btn-sound" class="icon-btn on">♪</button>
+      <button id="btn-settings-2" class="icon-btn">=</button>
+    </div>
+  </header>
+
+  <div id="clock" class="clock">
+    <span id="clock-label" class="clock-label">MOVES 00</span>
+    <div id="clock-ticks" class="clock-ticks"></div>
+  </div>
+
+  <div id="charges" class="charges"></div>
+  <div id="ability-bar" class="ability-bar"></div>
+
+  <div class="tray tray-enemy">
+    <span class="tray-label">敵</span>
+    <div id="hand-g" class="tray-row"></div>
+  </div>
+
+  <div class="board-frame">
+    <div id="files" class="files"></div>
+    <div class="board-row">
+      <div id="board-wrap">
+        <div id="board"></div>
+        <div id="fx" class="fx"></div>
+        <div id="judge" class="judge"></div>
+        <div id="combo" class="combo hidden"><small>CHAIN</small><span id="combo-n"></span></div>
+        <div id="announce" class="announce"></div>
+
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card">
+            <p class="tag" id="overlay-tag"></p>
+            <div id="overlay-rank" class="rank hidden"><b id="rank-letter"></b><i>RANK</i></div>
+            <p id="overlay-title"></p>
+            <p id="overlay-body"></p>
+            <div id="overlay-actions"></div>
+          </div>
+        </div>
+
+        <div id="draft" class="overlay hidden">
+          <div class="draft-card">
+            <p class="tag" id="draft-tag">SEARCH</p>
+            <p class="draft-head" id="draft-head"></p>
+            <div id="draft-choices" class="draft-choices"></div>
+          </div>
+        </div>
+      </div>
+      <div id="ranks" class="ranks"></div>
+    </div>
+  </div>
+
+  <div class="tray tray-self">
+    <span class="tray-label">自</span>
+    <div id="hand-s" class="tray-row"></div>
+  </div>
+
+  <p id="log" class="log"></p>
+</div>
+
+<!-- ============ モーダル ============ -->
+<div id="promo" class="modal hidden">
+  <div class="modal-card">
+    <p class="tag">YES ? NO</p>
+    <p class="modal-q">成りますか</p>
+    <div class="modal-actions">
+      <button id="promo-yes" class="btn primary"><b>成る</b><i>YES</i></button>
+      <button id="promo-no" class="btn"><b>成らず</b><i>NO</i></button>
+    </div>
+  </div>
+</div>
+
+<div id="settings" class="modal hidden">
+  <div class="modal-card">
+    <p class="tag">settings</p>
+    <p class="modal-q">設定</p>
+
+    <div class="set-row">
+      <label for="vol-bgm">BGM</label>
+      <input id="vol-bgm" type="range" min="0" max="100" step="1" value="50">
+      <b id="vol-bgm-v">50</b>
+    </div>
+    <div class="set-row">
+      <label for="vol-sfx">効果音</label>
+      <input id="vol-sfx" type="range" min="0" max="100" step="1" value="90">
+      <b id="vol-sfx-v">90</b>
+    </div>
+    <div class="set-row">
+      <label for="opt-motion">演出</label>
+      <select id="opt-motion">
+        <option value="full">通常</option>
+        <option value="calm">控えめ(揺れ・閃光を弱める)</option>
+      </select>
+    </div>
+
+    <p class="set-note">初期設定 — BGM 50 / 効果音 90 / 演出 通常</p>
+
+    <div class="modal-actions">
+      <button id="settings-reset" class="btn ghost"><b>初期設定に戻す</b><i>reset</i></button>
+      <button id="settings-close" class="btn"><b>閉じる</b><i>close</i></button>
+    </div>
+  </div>
+</div>
+
+<div id="ability-modal" class="modal hidden">
+  <div class="modal-card wide">
+    <p class="tag">ABILITIES</p>
+    <div id="ability-list" class="ability-list"></div>
+    <div class="modal-actions">
+      <button id="ability-close" class="btn"><b>閉じる</b><i>CLOSE</i></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="game.js?v=1788617297"></script>
+</body>
+</html>

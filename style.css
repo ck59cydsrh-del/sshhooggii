@@ -1,0 +1,823 @@
+/* 日本語は同梱の Shippori Mincho(SIL OFL)。この機にヒラギノは無く、
+   ブラウザが名前で解決できる和書体はOsakaだけだったため、
+   環境に依存せず意図した字形が出るよう605字にサブセットして同梱している。 */
+@font-face{
+  font-family:"Shippori";
+  src:url("font/shippori-Regular.woff2") format("woff2");
+  font-weight:400;font-display:swap;
+}
+@font-face{
+  font-family:"Shippori";
+  src:url("font/shippori-Medium.woff2") format("woff2");
+  font-weight:500 700;font-display:swap;
+}
+
+/* ============================================================
+   sshhooggii — ミニマルテクノの盤面。
+   参照: Raster-Noton / Basic Channel / Chain Reaction の意匠。
+   減色(墨と灰のみ、朱は一色だけ)、極小の文字に広いトラッキング、
+   ヘアライン、大きな余白、装飾影なし、動きは直線的。
+   色と大きさが出るのは報酬の瞬間だけ。静けさが打点を立たせる。
+   ============================================================ */
+:root{
+  --paper:#EDEDEA;
+  --ink:#0E0E10;
+  /* 灰は実測でコントラストを取ってある(対 #EDEDEA)
+     g70=7.3:1 / g45=4.7:1 本文可 / g26=3.1:1 大きい文字のみ / g12以下は罫専用 */
+  --g70:rgba(14,14,16,.72);
+  --g45:rgba(14,14,16,.59);
+  --g26:rgba(14,14,16,.46);
+  --g12:rgba(14,14,16,.16);
+  --g06:rgba(14,14,16,.09);
+  /* 色は白・緑・黒のみ。緑は面と文字で明度を分ける
+     面: #5BD426 は白地で1.64:1 なので文字には使えない(その上の黒は10:1)
+     文字: #146B12 は白地で5.70:1 で本文に使える */
+  --glow:#5BD426;
+  --glow-hi:#B6F03A;
+  --green:#146B12;
+  --green-soft:rgba(20,107,18,.14);
+  /* ラテンは幾何学サンセリフのFutura(小さい字はAvenir)。日本語は同梱の明朝。
+     Helvetica/Arialは既定すぎるので使わない。 */
+  --sans:Avenir,"Avenir Next",Futura,"Shippori",sans-serif;
+  --mincho:"Shippori","Hiragino Mincho ProN","Yu Mincho",serif;
+  /* 参照画像のコントラストの高いセリフ。macOSのDidotが第一候補 */
+  --didone:Futura,"Avenir Next",Avenir,"Shippori",sans-serif;
+  /* jelly: 押すと沈み、戻るときに行き過ぎて揺れて収まる */
+  --jelly:cubic-bezier(.18,1.5,.3,1);
+  --jelly-soft:cubic-bezier(.22,1.25,.36,1);
+}
+
+/* jelly: 押下と出現の共通動作 */
+@keyframes jelly{
+  0%{transform:scale(1,1)}
+  26%{transform:scale(1.1,.88)}
+  48%{transform:scale(.94,1.06)}
+  70%{transform:scale(1.03,.98)}
+  100%{transform:scale(1,1)}
+}
+@keyframes jellyIn{
+  0%{opacity:0;transform:scale(.7,1.24)}
+  42%{opacity:1;transform:scale(1.08,.93)}
+  68%{transform:scale(.97,1.03)}
+  100%{opacity:1;transform:scale(1,1)}
+}
+/* 控えめモードは装飾のループだけ止める。判定など終端のある演出は残す */
+body.calm .wordmark::before,
+body.calm .clock.collapse .clock-ticks b,
+body.calm .ringburst{animation:none}
+
+*{box-sizing:border-box;margin:0;padding:0}
+/* 触って遊ぶ前提の下ごしらえ */
+button,select,input,.cell,.pc{touch-action:manipulation}
+button,a{-webkit-tap-highlight-color:transparent}
+
+html{background:var(--paper)}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-weight:400;
+  font-feature-settings:"tnum" 1;
+  min-height:100vh;
+  display:flex;justify-content:center;
+  padding:max(34px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+          max(64px, calc(env(safe-area-inset-bottom) + 40px)) max(24px, env(safe-area-inset-left));
+  -webkit-text-size-adjust:100%;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+#crt{
+  position:fixed;inset:0;pointer-events:none;z-index:50;
+  opacity:.34;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.13'/%3E%3C/svg%3E");
+}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:48;background:var(--ink);opacity:0}
+#flash.on{animation:flash .14s steps(2,end)}
+#flash.on.hard{background:var(--glow);animation:flashHard .3s steps(4,end)}
+@keyframes flash{0%{opacity:.16}100%{opacity:0}}
+@keyframes flashHard{0%{opacity:.42}40%{opacity:.10}70%{opacity:.24}100%{opacity:0}}
+
+.screen{width:100%;max-width:430px;position:relative;z-index:1}
+.hidden{display:none !important}
+
+/* ---------- 共通 ---------- */
+.tag{
+  font-size:10px;font-weight:400;letter-spacing:.3em;text-transform:lowercase;
+  color:var(--g70);margin-bottom:20px;
+}
+.screen-title{
+  font-family:var(--didone);font-size:30px;letter-spacing:.2em;font-weight:400;
+  margin-bottom:34px;line-height:1;
+}
+/* 陣営と編成名は行を分けて折り返しを防ぐ */
+#deck-title{display:flex;flex-direction:column;gap:8px;font-size:26px}
+.dt-side{font-family:var(--mincho);font-size:14px;letter-spacing:.3em;color:var(--g45)}
+.dt-name{font-family:var(--mincho);font-size:22px;letter-spacing:.16em;line-height:1.2}
+.hint{font-size:10.5px;font-weight:400;line-height:2.05;color:var(--g70);
+  margin-bottom:22px;letter-spacing:.08em}
+
+/* ボタン = 塗らない。ヘアラインと余白だけ */
+.btn{
+  font-family:var(--sans);cursor:pointer;text-align:left;
+  background:transparent;border:0;border-top:1px solid var(--g12);
+  color:var(--ink);padding:15px 2px 14px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  transition:padding-left .14s linear,color .14s linear;
+}
+.btn b{font-family:var(--mincho);font-size:14px;letter-spacing:.34em;font-weight:400}
+.btn i{font-style:normal;font-size:9.5px;letter-spacing:.26em;color:var(--g45);text-transform:lowercase}
+.btn{transform-origin:left center}
+@media (hover:hover){ .btn:hover{padding-left:9px} }
+.btn:active{transform:scale(.985,1.06);opacity:.72}
+.btn.jelly{animation:jelly .42s var(--jelly)}
+.btn.primary{border-top-color:var(--ink)}
+.btn.primary b{letter-spacing:.4em}
+.btn.ghost b{color:var(--g45)}
+.btn.danger b,.btn.danger i{color:var(--green)}
+.btn.disabled{opacity:.25;pointer-events:none}
+.menu{display:flex;flex-direction:column;gap:0;margin-top:38px;
+  border-bottom:1px solid var(--g12)}
+
+/* ---------- 主メニュー ---------- */
+.main-menu{margin-top:44px;border-bottom:0}
+.mi{
+  font-family:var(--sans);cursor:pointer;text-align:left;
+  background:transparent;border:0;border-top:1px solid var(--g12);
+  color:var(--ink);padding:17px 2px 16px;width:100%;
+  display:flex;align-items:baseline;gap:14px;
+  transition:padding-left .16s var(--jelly-soft);
+}
+.mi:last-child{border-bottom:1px solid var(--g12)}
+@media (hover:hover){ .mi:hover{padding-left:10px} }
+.mi:active{opacity:.55}
+.mi.jelly{animation:jelly .42s var(--jelly)}
+.mi-no{font-size:10px;letter-spacing:.16em;color:var(--g26);flex:none;padding-top:2px}
+.mi-body{display:flex;flex-direction:column;gap:5px;flex:none}
+.mi b{font-family:var(--mincho);font-size:20px;letter-spacing:.28em;font-weight:400;line-height:1}
+.mi-sub{font-size:9.5px;letter-spacing:.08em;color:var(--g45);line-height:1.5}
+/* 名前と欧文ラベルのあいだを罫で埋める */
+.mi-rule{flex:1;height:1px;background:var(--g12);align-self:center;margin-top:6px;
+  transition:background .16s linear}
+@media (hover:hover){ .mi:hover .mi-rule{background:var(--g45)} }
+.mi i{font-style:normal;font-size:9.5px;letter-spacing:.24em;color:var(--g45);flex:none;
+  text-transform:lowercase;padding-top:3px}
+/* 先頭だけ主役として濃くする */
+.mi.primary{border-top-color:var(--ink)}
+.mi.primary b{font-size:24px}
+.mi.primary .mi-no{color:var(--green)}
+.mi.primary i{color:var(--green)}
+
+.icon-btn{
+  font-family:var(--sans);font-size:10.5px;letter-spacing:.14em;
+  min-width:38px;height:34px;line-height:1;cursor:pointer;
+  background:transparent;border:0;border-bottom:1px solid var(--g12);color:var(--g26);
+}
+.icon-btn{color:var(--g45)}
+.icon-btn.on{color:var(--ink);border-bottom-color:var(--ink)}
+.icon-btn{transition:transform .1s var(--jelly-soft)}
+.icon-btn:active{transform:scale(.85,1.15);opacity:.6}
+
+/* ---------- タイトル ---------- */
+
+.wordmark{
+  position:relative;display:inline-block;
+  font-family:var(--didone);font-weight:400;
+  font-size:clamp(32px,10vw,46px);letter-spacing:.02em;line-height:1;
+  text-transform:lowercase;
+}
+.wordmark span{position:relative;z-index:3}
+/* 版ズレは一段階だけ、灰で。常時は動かない */
+.wordmark::before{
+  content:attr(data-word);position:absolute;left:0;top:0;z-index:1;
+  color:var(--g26);transform:translate(2px,0);
+  animation:slip 9s steps(1,end) infinite;
+}
+@keyframes slip{
+  0%,96%{transform:translate(2px,0);color:var(--g26)}
+  97%{transform:translate(-7px,1px);color:var(--green)}
+  98%{transform:translate(5px,-1px);color:var(--g26)}
+  99%,100%{transform:translate(2px,0)}
+}
+.sub{margin-top:16px;font-size:10px;letter-spacing:.3em;color:var(--g45);text-transform:lowercase}
+.lead{margin-top:40px;font-family:var(--mincho);font-size:12px;line-height:2.5;
+  color:var(--g70);letter-spacing:.14em}
+.record{margin-top:26px;font-size:10px;letter-spacing:.18em;color:var(--g70)}
+
+.rules{margin-top:44px;border-top:1px solid var(--g12);padding-top:16px}
+.rules summary{font-size:10px;letter-spacing:.3em;color:var(--g70);cursor:pointer;
+  list-style:none;text-transform:lowercase}
+.rules summary::-webkit-details-marker{display:none}
+.rules-body{padding-top:22px;font-size:10.5px;line-height:2.05;color:var(--g70);letter-spacing:.05em}
+.rules-body b{color:var(--ink);font-weight:400}
+.glyph-legend{list-style:none;margin:18px 0 0;display:flex;flex-direction:column;gap:0}
+.glyph-legend li{display:flex;gap:16px;align-items:baseline;
+  border-top:1px solid var(--g06);padding:5px 0}
+.glyph-legend b{font-family:var(--mincho);font-size:12px;letter-spacing:.2em;min-width:48px;font-weight:400}
+.glyph-legend span{font-size:10.5px;color:var(--g70)}
+.glyph-legend i{font-family:var(--mincho);font-style:normal;color:var(--green)}
+.house-rules{margin-top:26px;font-size:10px;letter-spacing:.3em;color:var(--g70);text-transform:lowercase}
+.house-list{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.house-list li{font-size:10.5px;line-height:1.95;padding-left:16px;position:relative;letter-spacing:.03em;color:var(--g70)}
+.house-list li::before{content:"";position:absolute;left:0;top:.72em;width:8px;height:1px;background:var(--g26)}
+
+/* ---------- はじめての説明 ---------- */
+.tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}
+.tut-note{font-size:10px;letter-spacing:.06em;color:var(--g45);text-align:center;line-height:1.7}
+.tut-text{font-size:12.5px;line-height:2.05;color:var(--g70);letter-spacing:.04em;margin-bottom:6px}
+.tut-text b{color:var(--ink);font-weight:400;box-shadow:inset 0 -6px 0 var(--green-soft)}
+
+/* 小さな盤の図。本体の盤と同じ語彙で描く */
+.mini{width:min(230px,72vw);height:auto;display:block}
+.mini.small{width:76px}
+.mini .m-grid{stroke:var(--g12);stroke-width:1}
+.mini .m-move,.mini .m-drop{fill:var(--glow);stroke:var(--ink);stroke-width:1}
+.mini .m-drop{opacity:.75}
+.mini .m-take{fill:none;stroke:var(--ink);stroke-width:2}
+.mini .m-pc{fill:var(--paper);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:miter}
+.mini .m-pc.gote{fill:var(--ink)}
+.mini .m-pc.pr{stroke:var(--green)}
+.mini .m-gl{font-family:var(--mincho);font-size:11px;fill:var(--ink)}
+.mini .m-gl.gote{fill:var(--paper)}
+.mini .m-gl.pr{fill:var(--green)}
+
+/* 駒の動き一覧 */
+.piece-guide{display:flex;flex-direction:column;gap:0;margin-top:6px}
+.pg{display:flex;align-items:center;gap:16px;border-top:1px solid var(--g06);padding:10px 0}
+.pg-t{display:flex;flex-direction:column;gap:4px}
+.pg-t b{font-family:var(--mincho);font-size:15px;letter-spacing:.2em;font-weight:400}
+.pg-t span{font-size:10.5px;color:var(--g70);line-height:1.6}
+.note{font-size:10.5px;line-height:1.9;color:var(--g70);margin-top:14px}
+
+/* ---------- セットアップ / プリセット ---------- */
+.setup-row{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.setup-row label{font-size:10.5px;letter-spacing:.18em;min-width:58px;color:var(--g70)}
+.setup-row select{
+  flex:1;font-family:var(--sans);font-size:11px;padding:9px 0;border-radius:0;
+  background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);
+  letter-spacing:.06em;
+}
+.army-note{font-size:10.5px;line-height:1.9;color:var(--g70);letter-spacing:.04em;
+  margin:-6px 0 18px 70px;min-height:1.9em}
+
+.preset-list{display:flex;flex-direction:column;gap:0;margin-bottom:26px;
+  border-bottom:1px solid var(--g12)}
+.preset{
+  font-family:var(--sans);text-align:left;cursor:pointer;color:var(--ink);
+  background:transparent;border:0;border-top:1px solid var(--g12);
+  padding:13px 2px;display:flex;gap:16px;align-items:baseline;
+  transition:padding-left .14s linear;
+}
+@media (hover:hover){ .preset:hover{padding-left:8px} }
+.preset:active{transform:scale(.995,1.03)}
+.preset.jelly{animation:jelly .4s var(--jelly)}
+.preset.empty{color:var(--g26)}
+.preset.confirm .pslot,.preset.confirm .pmain b{color:var(--green)}
+.preset.just-saved .pslot{color:var(--green)}
+.pslot{font-size:10.5px;letter-spacing:.14em;color:var(--g45);min-width:22px}
+.pmain{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pmain b{font-family:var(--mincho);font-size:13px;letter-spacing:.2em;font-weight:400}
+.ppool{font-family:var(--mincho);font-size:12px;letter-spacing:.18em;color:var(--g70)}
+.pab{font-size:9.5px;color:var(--g45);letter-spacing:.14em}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding-bottom:20px}
+.hud-floor{display:flex;align-items:center;gap:11px}
+.sigil{width:20px;height:20px;image-rendering:pixelated;display:block;opacity:.8}
+.hud-floor-text{display:flex;flex-direction:column;gap:5px}
+#floor-label{font-size:11px;letter-spacing:.24em;color:var(--ink)}
+#turn-label{font-size:9.5px;letter-spacing:.22em;color:var(--g70)}
+.hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.score{
+  font-family:var(--sans);font-size:17px;font-weight:400;letter-spacing:.06em;
+  color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;
+}
+.score.bump{animation:scorepop .1s steps(2,end)}
+@keyframes scorepop{50%{opacity:.35}}
+
+/* 手数計 */
+.clock{display:flex;align-items:center;gap:14px;padding-bottom:16px}
+.clock-label{font-size:10px;letter-spacing:.22em;color:var(--g70);white-space:nowrap;min-width:92px}
+.clock-ticks{display:flex;align-items:center;gap:2px;flex:1;height:8px}
+.clock-ticks b{flex:1;height:8px;background:var(--glow-deep);display:block;max-width:2px}
+.clock-ticks b.spent{height:1px;background:var(--g12)}
+.clock.low .clock-label{color:var(--ink)}
+.clock.low .clock-ticks b:not(.spent){background:var(--ink);max-width:3px}
+.clock.collapse .clock-label{color:var(--paper);background:var(--ink);padding:2px 7px}
+.clock.collapse .clock-ticks b{background:var(--ink);height:10px;max-width:3px;
+  animation:collapseblink .5s steps(2,end) infinite}
+@keyframes collapseblink{50%{opacity:.15}}
+
+.charges{display:flex;flex-wrap:wrap;gap:18px;padding-bottom:14px;
+  font-size:9.5px;letter-spacing:.22em;color:var(--g45)}
+.charge{display:flex;align-items:center;gap:7px}
+.charge i{display:flex;gap:3px}
+.charge i b{width:4px;height:4px;background:var(--glow-deep);display:block}
+.charge i b.off{background:var(--g12)}
+.charge.hot i b{background:var(--green)}
+
+.ability-bar{display:flex;gap:0 16px;flex-wrap:wrap;padding-bottom:18px}
+.chip{font-size:10px;letter-spacing:.12em;cursor:pointer;white-space:nowrap;
+  border:0;color:var(--g45);background:transparent;padding:0;
+  display:inline-flex;align-items:center;gap:4px}
+.chip i{font-family:var(--mincho);font-style:normal;font-size:9px;line-height:1;
+  border:1px solid currentColor;padding:1px 2px}
+.chip.r2{color:var(--green)}
+.chip.r3{color:var(--paper);background:var(--ink);padding:1px 6px}
+
+/* ---------- 持ち駒 ---------- */
+.tray{display:flex;align-items:center;gap:14px;min-height:48px}
+.tray-label{font-family:var(--mincho);font-size:12px;letter-spacing:.2em;color:var(--g70);min-width:18px}
+.tray-row{display:flex;flex-wrap:wrap;gap:5px;flex:1;align-items:center}
+.tray-self{margin-top:18px}
+.tray-enemy{margin-bottom:16px}
+.hand-item{display:flex;align-items:flex-end;gap:2px;padding:6px 2px;margin:-6px 0}
+.hand-count{font-size:10px;color:var(--g70);padding-bottom:2px;letter-spacing:.04em}
+.tray-empty{font-size:10px;letter-spacing:.22em;color:var(--g26)}
+
+/* ---------- 盤 ---------- */
+.board-frame{display:flex;flex-direction:column;gap:9px}
+.board-row{display:flex;gap:9px;align-items:stretch}
+.files,.ranks{display:grid;font-size:9px;letter-spacing:.1em;color:var(--g45)}
+.files{grid-template-columns:repeat(5,1fr);margin-right:19px}
+.files span{text-align:center}
+.ranks{grid-template-rows:repeat(5,1fr);width:10px;align-items:center}
+.ranks span{text-align:center}
+
+#board-wrap{position:relative;flex:1}
+
+#board-wrap.shaking{animation:shake .12s steps(3,end)}
+@keyframes shake{
+  0%{transform:translate(0,0)}
+  33%{transform:translate(calc(-2px*var(--shake,1)),calc(1px*var(--shake,1)))}
+  66%{transform:translate(calc(2px*var(--shake,1)),calc(-1px*var(--shake,1)))}
+  100%{transform:translate(0,0)}
+}
+#board{
+  display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);
+  aspect-ratio:1/1;width:100%;border:1px solid var(--ink);
+  background:var(--paper);          /* 盤は常に白。背景の緑から抜ける */
+  position:relative;z-index:1;
+  transition:box-shadow .4s var(--jelly-soft);
+}
+.cell{
+  position:relative;
+  border-right:1px solid var(--g12);
+  border-bottom:1px solid var(--g12);
+  display:flex;align-items:center;justify-content:center;
+}
+.cell:nth-child(5n){border-right:none}
+.cell:nth-child(n+21){border-bottom:none}
+.cell.blocked{background:var(--ink)}
+/* 成り域 = 極細の罫を一本だけ */
+.cell.zone::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--g26);
+}
+.cell.zone-foe::before{top:auto;bottom:0;background:var(--ink);opacity:.4}
+/* 移動先 = 小さな輪郭の円 */
+/* 緑は白地で1.64:1しかないので、機能的な印には黒の輪郭を必ず添える */
+.cell.move::after{
+  content:"";position:absolute;width:30%;aspect-ratio:1;border-radius:50%;
+  background:var(--glow);box-shadow:0 0 0 1.5px var(--ink);pointer-events:none;
+  animation:jellyIn .3s var(--jelly);
+}
+body.fever .cell.move::after{background:var(--glow-hi)}
+.cell.capture{box-shadow:inset 0 0 0 2px var(--ink)}
+.cell.sel{box-shadow:inset 0 0 0 1px var(--ink)}
+.cell.clickable{cursor:pointer}
+
+/* ---------- 駒 ---------- */
+.pc{width:78%;height:78%;overflow:visible;display:block}
+.pc polygon{fill:var(--paper);stroke:var(--ink);stroke-width:2.4;stroke-linejoin:miter}
+.pc text{font-family:var(--mincho);font-size:54px;font-weight:400;fill:var(--ink)}
+.pc.gote{transform:rotate(180deg)}
+.pc.gote polygon{fill:var(--ink)}
+.pc.gote text{fill:var(--paper)}
+.pc.pr polygon{stroke:var(--green)}
+.pc.pr text{fill:var(--green)}
+.pc.gote.pr polygon{fill:var(--green);stroke:var(--green)}
+.pc.gote.pr text{fill:var(--paper)}
+/* 後手の駒は rotate(180deg) が効いているので、jellyのkeyframesが
+   transform を上書きすると回転が消えて上下逆さまに見える。
+   後手用に回転込みのkeyframesを別に用意する。 */
+.pc.placed{animation:jelly .42s var(--jelly)}
+.pc.gote.placed{animation:jellyGote .42s var(--jelly)}
+@keyframes jellyGote{
+  0%{transform:rotate(180deg) scale(1,1)}
+  26%{transform:rotate(180deg) scale(1.1,.88)}
+  48%{transform:rotate(180deg) scale(.94,1.06)}
+  70%{transform:rotate(180deg) scale(1.03,.98)}
+  100%{transform:rotate(180deg) scale(1,1)}
+}
+.pc.hand{width:30px;height:33px;cursor:pointer;transition:transform .1s var(--jelly-soft)}
+.pc.hand:active{transform:scale(.86,1.16)}
+.pc.gote.hand:active{transform:rotate(180deg) scale(.86,1.16)}
+.pc.hand.selected polygon{stroke-width:4}
+
+/* ---------- 演出: ここだけ大きさと色が出る ---------- */
+.fx{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:3}
+.pop{
+  position:absolute;transform:translate(-50%,-50%);
+  font-family:var(--sans);font-size:12px;font-weight:400;letter-spacing:.14em;
+  color:var(--ink);white-space:nowrap;animation:pop .7s linear forwards;
+}
+.pop.big{font-size:16px;color:var(--green)}
+.pop.mark{color:var(--g45);font-size:10px}
+.pop.warn{color:var(--green)}
+@keyframes pop{
+  0%{opacity:0;transform:translate(-50%,-40%)}
+  14%{opacity:1;transform:translate(-50%,-60%)}
+  100%{opacity:0;transform:translate(-50%,-120%)}
+}
+.spark{position:absolute;width:2px;height:2px;background:var(--ink);
+  transform:translate(-50%,-50%);animation:spark .38s linear forwards}
+.spark.tri{background:var(--green)}
+@keyframes spark{
+  0%{opacity:1;transform:translate(-50%,-50%)}
+  100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy)))}
+}
+
+/* 判定 */
+.judge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;z-index:6}
+.jd{
+  font-family:var(--mincho);font-weight:400;line-height:1;
+  animation:jdIn .44s linear forwards;
+}
+.jd.t1{font-size:19px;letter-spacing:.6em;color:var(--g70)}
+.jd.t2{font-size:27px;letter-spacing:.5em;color:var(--ink)}
+.jd.t3{font-size:40px;letter-spacing:.4em;color:var(--ink)}
+.jd.t4{font-size:62px;letter-spacing:.26em;color:var(--green)}
+.jd.t4::before,.jd.t4::after{content:''}
+@keyframes jdIn{
+  0%{opacity:0;letter-spacing:1.2em}
+  22%{opacity:1}
+  74%{opacity:1}
+  100%{opacity:0}
+}
+
+.combo{position:absolute;top:2px;right:2px;pointer-events:none;text-align:right;z-index:4}
+.combo small{font-size:9px;letter-spacing:.26em;display:block;color:var(--g45)}
+.combo span{
+  font-family:var(--sans);font-size:26px;font-weight:400;letter-spacing:.02em;
+  line-height:1.1;display:block;color:var(--ink);font-variant-numeric:tabular-nums;
+}
+.combo.bump{animation:combobump .1s steps(2,end)}
+@keyframes combobump{50%{opacity:.3}}
+
+/* FEVER = 盤は白のまま。縁の緑と連鎖の色だけで示す(背景は動かさない) */
+body.fever #board{box-shadow:0 0 0 3px var(--glow)}
+body.fever .cell.zone::before{background:var(--glow)}
+body.fever .combo span{color:var(--green)}
+body.fever .cell.move::after{background:var(--glow-hi)}
+
+/* 能力の発動表示 = 盤を横切る反転した帯。見落とさない大きさにする */
+.announce{position:absolute;left:0;right:0;top:16%;z-index:8;pointer-events:none;
+  display:flex;flex-direction:column;align-items:stretch;gap:5px}
+.ann{
+  position:relative;background:var(--ink);color:var(--paper);
+  padding:9px 14px 10px 40px;text-align:left;
+  animation:jellyIn .34s var(--jelly);
+  border-left:5px solid var(--paper);
+}
+.ann i{position:absolute;left:12px;top:11px;font-style:normal;font-family:var(--mincho);
+  font-size:14px;letter-spacing:0;color:var(--paper);opacity:.55}
+.ann b{display:block;font-family:var(--mincho);font-size:19px;letter-spacing:.28em;
+  font-weight:400;line-height:1.25}
+.ann .ann-yomi{display:block;font-size:9px;letter-spacing:.28em;
+  color:rgba(237,237,234,.5);margin-top:2px;text-transform:lowercase}
+.ann span{display:block;font-size:10.5px;letter-spacing:.06em;
+  color:rgba(237,237,234,.78);margin-top:5px}
+.ann.r2{border-left-color:var(--glow)}
+.ann.r3{background:var(--glow);border-left-color:var(--ink)}
+.ann.r3 i,.ann.r3 b,.ann.r3 span{color:var(--ink)}
+.ann.r3 .ann-yomi{color:rgba(14,14,16,.6)}
+.ann.out{animation:annOut .26s linear forwards}
+
+@keyframes annOut{to{opacity:0;transform:translateY(-8px)}}
+
+.ann.cap{background:var(--paper);color:var(--ink);border-left-color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--g26)}
+.ann.cap i{color:var(--ink);opacity:1;font-size:15px}
+.ann.cap b{color:var(--ink);font-size:17px}
+.ann.cap span{color:var(--g45)}
+.ann.cap.gote{border-left-color:var(--g45)}
+/* 取った駒が入った側のトレイを光らせる */
+.tray-row.gained{animation:gained .5s var(--jelly)}
+@keyframes gained{
+  0%{transform:scale(1)}
+  30%{transform:scale(1.06)}
+  100%{transform:scale(1)}
+}
+
+/* 盤の縁から広がる輪 */
+.ringburst{position:absolute;inset:0;pointer-events:none;z-index:2;
+  border:2px solid var(--ink);animation:ringburst .6s linear forwards}
+.ringburst.hard{border-color:var(--glow);border-width:4px}
+@keyframes ringburst{
+  0%{transform:scale(1);opacity:.9}
+  100%{transform:scale(1.13);opacity:0}
+}
+body.fever .ringburst{border-color:var(--glow)}
+
+/* 階の遷移。墨の帯が走り、階数が刻まれる */
+#transition{
+  position:fixed;inset:0;z-index:92;pointer-events:none;background:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  transform:scaleX(0);transform-origin:left center;
+}
+#transition.run{animation:trWipe .9s cubic-bezier(.7,0,.3,1) forwards}
+#transition b{font-family:var(--didone);font-size:76px;line-height:.85;color:var(--paper);
+  display:block;opacity:0}
+#transition i{font-style:normal;font-size:10px;letter-spacing:.5em;color:var(--glow);
+  display:block;text-align:center;text-indent:.5em;opacity:0}
+#transition.run b{animation:trNum .9s linear forwards}
+#transition.run i{animation:trNum .9s linear forwards}
+@keyframes trWipe{
+  0%{transform:scaleX(0);transform-origin:left center}
+  34%{transform:scaleX(1);transform-origin:left center}
+  56%{transform:scaleX(1);transform-origin:right center}
+  100%{transform:scaleX(0);transform-origin:right center}
+}
+@keyframes trNum{0%,18%{opacity:0}30%{opacity:1}52%{opacity:1}62%,100%{opacity:0}}
+
+/* 盤の中央に刻む区切り */
+.stamp{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-family:var(--didone);font-size:40px;line-height:1;color:var(--ink);
+  white-space:nowrap;animation:stampIn .9s cubic-bezier(.15,1.7,.4,1) forwards;
+}
+.stamp.big{font-family:var(--mincho);font-size:46px;letter-spacing:.14em}
+.stamp.score{font-size:34px;color:var(--green)}
+.stamp.best{font-family:var(--mincho);font-size:44px;letter-spacing:.3em;color:var(--green)}
+.stamp.fever{font-size:52px;letter-spacing:.14em;color:var(--green)}
+.stamp.last{font-family:var(--mincho);font-size:32px;letter-spacing:.24em}
+@keyframes stampIn{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(2.2)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-62%) scale(1.05)}
+}
+
+/* 残り3手以下。盤の縁が脈打つ */
+body.urgent #board{animation:urgent 1s ease-in-out infinite}
+@keyframes urgent{
+  0%,100%{box-shadow:0 0 0 1px var(--ink)}
+  50%{box-shadow:0 0 0 3px var(--ink)}
+}
+body.collapsing #board{animation:collapsing .5s steps(2,end) infinite}
+@keyframes collapsing{
+  0%,100%{box-shadow:0 0 0 3px var(--ink)}
+  50%{box-shadow:0 0 0 3px var(--glow)}
+}
+body.calm #transition.run,body.calm .stamp,
+body.calm.urgent #board,body.calm.collapsing #board{animation:none}
+
+/* ---------- オーバーレイ ---------- */
+.overlay{position:absolute;inset:0;background:var(--paper);
+  display:flex;align-items:center;justify-content:center;padding:22px;z-index:7}
+.overlay-card{width:100%;max-width:290px}
+#overlay-title{font-family:var(--didone);font-size:28px;letter-spacing:.16em;
+  margin-bottom:18px;line-height:1.35;font-weight:400}
+#overlay-body{font-size:10.5px;line-height:2.15;color:var(--g70);margin-bottom:26px;
+  white-space:pre-line;letter-spacing:.08em}
+#overlay-actions{display:flex;flex-direction:column;gap:0;border-bottom:1px solid var(--g12)}
+
+.rank{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+.rank b{font-family:var(--didone);font-size:66px;font-weight:400;line-height:.78;
+  color:var(--ink);animation:jellyIn .5s var(--jelly)}
+.rank i{font-style:normal;font-size:9.5px;letter-spacing:.3em;color:var(--g45)}
+.rank.s b{color:var(--green)}
+.rank.c b{color:var(--g26)}
+
+/* ---------- 能力ドラフト ---------- */
+.draft-card{width:100%;max-width:308px}
+.draft-head{font-size:10px;letter-spacing:.22em;color:var(--g70);margin-bottom:16px}
+.draft-choices{display:flex;flex-direction:column;gap:9px;border:0}
+
+/* 選択肢はカード。押せる面として立てる */
+.draft-choice{
+  font-family:var(--sans);text-align:left;cursor:pointer;position:relative;
+  background:var(--paper);color:var(--ink);border:1px solid var(--g26);
+  padding:11px 13px 13px;display:grid;gap:0;
+  grid-template-columns:1fr;
+  transition:border-color .12s linear,transform .12s var(--jelly-soft);
+}
+@media (hover:hover){ .draft-choice:hover{border-color:var(--ink)} }
+.draft-choice:active{transform:translateY(1px)}
+/* 一枚ずつ配られる */
+.draft-choice{animation:cardIn .38s var(--jelly) backwards;animation-delay:calc(var(--i,0)*.11s)}
+@keyframes cardIn{
+  0%{opacity:0;transform:translateY(14px) scale(.94,1.06)}
+  60%{opacity:1}
+  100%{opacity:1;transform:none}
+}
+/* 選んだ一枚が確定し、他は引く */
+.draft-choice.chosen{animation:cardPick .42s var(--jelly) forwards;border-color:var(--ink);z-index:2}
+.draft-choice.r2.chosen{border-color:var(--green)}
+@keyframes cardPick{
+  0%{transform:scale(1,1)}
+  30%{transform:scale(1.05,.93)}
+  60%{transform:scale(.99,1.02)}
+  100%{transform:scale(1,1)}
+}
+.draft-choice.dimmed{animation:cardDim .3s linear forwards;pointer-events:none}
+@keyframes cardDim{to{opacity:.14;transform:scale(.97)}}
+.draft-choices.locked .draft-choice{cursor:default}
+
+.ac-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+/* 稀少度は独立した記号として最初に置く */
+.ac-badge{
+  font-family:var(--mincho);font-size:12px;letter-spacing:.1em;line-height:1;
+  width:22px;height:22px;display:grid;place-items:center;
+  border:1px solid var(--ink);color:var(--ink);flex:none;
+}
+.ac-cat{font-size:9.5px;letter-spacing:.24em;color:var(--g45)}
+.ac-no{margin-left:auto;font-size:9.5px;letter-spacing:.16em;color:var(--g45)}
+
+.ac-body{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ac-text{display:flex;flex-direction:column;min-width:0}
+.ac-name{font-family:var(--mincho);font-size:21px;letter-spacing:.22em;line-height:1.15}
+.ac-yomi{font-size:9px;letter-spacing:.26em;color:var(--g45);text-transform:lowercase;margin-top:3px}
+
+/* 効果の図。盤と同じ語彙(細い罫と面)で描く */
+.ac-diag{width:58px;height:58px;flex:none}
+.ac-diag .d-grid{stroke:var(--g12);stroke-width:1}
+.ac-diag .d-base{fill:var(--g26)}
+.ac-diag .d-new{fill:var(--glow);stroke:var(--ink);stroke-width:1}
+.ac-diag .d-pc{font-family:var(--mincho);font-size:11px;fill:var(--ink)}
+.draft-choice.r3 .ac-diag .d-grid{stroke:rgba(237,237,234,.22)}
+.draft-choice.r3 .ac-diag .d-base{fill:rgba(237,237,234,.4)}
+.draft-choice.r3 .ac-diag .d-new{fill:var(--glow);stroke:var(--paper)}
+.draft-choice.r3 .ac-diag .d-pc{fill:var(--paper)}
+.ac-desc{font-size:10.5px;line-height:1.8;color:var(--g70);letter-spacing:.03em;margin-top:8px}
+
+/* 希 = 緑の枠と緑の稀少度記号 */
+.draft-choice.r2{border-color:var(--green)}
+.draft-choice.r2 .ac-badge{border-color:var(--green);color:var(--green)}
+.draft-choice.r2 .ac-name{color:var(--green)}
+
+/* 極 = 反転。地が墨になり、紙色の文字が乗る */
+.draft-choice.r3{background:var(--ink);border-color:var(--ink)}
+.draft-choice.r3 .ac-badge{border-color:var(--glow);color:var(--glow)}
+.draft-choice.r3 .ac-name{color:var(--paper)}
+.draft-choice.r3 .ac-cat{color:rgba(237,237,234,.6)}
+.draft-choice.r3 .ac-no{color:rgba(237,237,234,.38)}
+.draft-choice.r3 .ac-yomi{color:rgba(237,237,234,.5)}
+.draft-choice.r3 .ac-desc{color:rgba(237,237,234,.82)}
+
+/* 設定の補足と初期化 */
+.set-note{font-size:9.5px;letter-spacing:.08em;color:var(--g45);margin-top:-4px;line-height:1.7}
+
+/* ローカル通信 */
+.net-box{border-top:1px solid var(--g12);margin-top:8px;padding-top:14px}
+.net-box input{flex:1;font-family:var(--sans);font-size:14px;letter-spacing:.24em;padding:9px 0;
+  background:transparent;border:0;border-bottom:1px solid var(--ink);color:var(--ink);
+  text-transform:uppercase;min-height:38px}
+.net-status{font-size:10px;line-height:1.8;color:var(--g70);letter-spacing:.04em;margin-top:6px}
+.net-status.good{color:var(--green)}
+.net-status.bad{color:var(--ink);font-weight:400;box-shadow:inset 3px 0 0 var(--ink);padding-left:9px}
+.net-url{font-size:9.5px;letter-spacing:.1em;color:var(--g45);margin-top:4px}
+.net-hint{font-size:9.5px;line-height:1.7;letter-spacing:.04em;color:var(--g45);margin-top:4px}
+
+/* ---------- 対戦の編成カード ---------- */
+.army{border-top:1px solid var(--ink);padding:12px 0 14px}
+.army-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.army-side{font-family:var(--mincho);font-size:15px;letter-spacing:.22em;flex:none;min-width:74px}
+.army-head select{flex:1;font-family:var(--sans);font-size:11px;padding:7px 0;border-radius:0;
+  background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);letter-spacing:.04em}
+.army-pieces{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:9px}
+.ap{display:inline-flex;align-items:baseline;gap:2px;border:1px solid var(--g26);padding:2px 6px}
+.ap b{font-family:var(--mincho);font-size:14px;font-weight:400;letter-spacing:.06em}
+.ap i{font-style:normal;font-size:9.5px;color:var(--g45)}
+.ap-sum{font-size:9.5px;letter-spacing:.12em;color:var(--g45);margin-left:auto}
+.ap-none{font-size:9.5px;letter-spacing:.08em;color:var(--g26)}
+.army-abils{display:flex;flex-wrap:wrap;gap:6px 12px;margin-bottom:8px;min-height:14px}
+.vs-mark{font-family:var(--mincho);font-size:13px;letter-spacing:.3em;color:var(--g26);
+  text-align:center;padding:6px 0}
+
+/* デッキ構築の補助 */
+.deck-quick{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mini{font-family:var(--sans);font-size:10px;letter-spacing:.1em;cursor:pointer;min-height:34px;
+  background:transparent;border:1px solid var(--g26);color:var(--g70);padding:6px 12px}
+.mini:active{opacity:.5}
+.deck-value{font-size:9.5px;letter-spacing:.12em;color:var(--g45);margin-left:auto}
+.deck-filter{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.fchip{font-family:var(--sans);font-size:10px;letter-spacing:.12em;cursor:pointer;min-height:32px;
+  background:transparent;border:1px solid var(--g12);color:var(--g45);padding:5px 11px}
+.fchip.on{border-color:var(--ink);color:var(--ink)}
+.fchip:active{opacity:.5}
+
+/* ---------- デッキ構築 ---------- */
+.deck-sec{margin-bottom:34px}
+.deck-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--ink);padding-bottom:7px;margin-bottom:14px}
+.deck-head span{font-family:var(--mincho);font-size:14px;letter-spacing:.34em;font-weight:400}
+.deck-head b{font-size:10px;letter-spacing:.14em;color:var(--g70);font-weight:400}
+.deck-head b.over{color:var(--green)}
+.deck-pieces{display:flex;flex-direction:column;gap:0}
+.deck-piece{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--g06);padding:7px 0}
+.deck-piece.on .dp-count{color:var(--ink)}
+.dp-name{font-family:var(--mincho);font-size:14px;letter-spacing:.2em;min-width:2.4em}
+.dp-count{flex:1;font-size:11px;letter-spacing:.1em;color:var(--g70)}
+.dp-count i{font-style:normal;color:var(--g26)}
+.dp-btn{font-family:var(--sans);font-size:15px;line-height:1;width:40px;height:36px;cursor:pointer;
+  background:transparent;border:1px solid var(--g12);color:var(--ink)}
+.dp-btn{transition:transform .1s var(--jelly-soft)}
+.dp-btn:active{transform:scale(.82,1.18);opacity:.55}
+.dp-btn.jelly{animation:jelly .34s var(--jelly)}
+.deck-meter{display:flex;gap:2px;height:6px;margin-bottom:16px}
+.deck-meter b{flex:1;height:6px;background:var(--glow);display:block;max-width:14px}
+.deck-meter b.spent{background:var(--g12)}
+.deck-abilities{display:flex;flex-direction:column;gap:0}
+.deck-ab{font-family:var(--sans);text-align:left;cursor:pointer;display:flex;gap:12px;
+  align-items:flex-start;background:transparent;border:0;border-bottom:1px solid var(--g06);
+  color:var(--ink);padding:11px 2px;transition:padding-left .14s linear}
+.deck-ab .ac-diag{width:46px;height:46px;margin-top:2px}
+/* 選択中は一目で分かるようにする(以前は字色だけで実質見えなかった) */
+.deck-ab.on{padding-left:8px;background:var(--green-soft);box-shadow:inset 3px 0 0 var(--green)}
+.da-tick{font-size:12px;line-height:1.4;color:var(--g26);flex:none;padding-top:1px}
+.deck-ab.on .da-tick{color:var(--green)}
+.deck-ab:active{opacity:.6}
+.deck-ab.on .da-cost{color:var(--green)}
+.deck-ab.on .da-main b{color:var(--ink)}
+.deck-head b b{font-weight:400;color:var(--ink)}
+.deck-head b b.full{color:var(--green)}
+.deck-ab:not(.on) .da-main b{color:var(--g45)}
+.deck-ab.off{opacity:.42;cursor:default}
+.da-cost{font-size:12px;min-width:16px;text-align:right;color:var(--g45);letter-spacing:.04em}
+.da-main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.da-head{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.da-badge{font-family:var(--mincho);font-size:10px;line-height:1;width:17px;height:17px;
+  display:grid;place-items:center;border:1px solid var(--g45);color:var(--g70);flex:none}
+.da-cat{font-size:9px;letter-spacing:.22em;color:var(--g45)}
+.da-earned{font-size:8.5px;letter-spacing:.2em;color:var(--green);
+  border:1px solid var(--green);padding:1px 4px;margin-left:auto}
+.da-desc{font-size:10px;line-height:1.75;color:var(--g70);letter-spacing:.03em;margin-top:3px}
+.deck-ab.r2 .da-badge{border-color:var(--green);color:var(--green)}
+.deck-ab.r3 .da-badge{border-color:var(--ink);color:var(--ink);background:var(--ink)}
+.deck-ab.r3 .da-badge{color:var(--paper)}
+.da-main b{font-family:var(--mincho);font-size:13px;letter-spacing:.24em;font-weight:400}
+
+.da-main span{font-size:10px;line-height:1.8;color:var(--g70);letter-spacing:.03em}
+.da-main span.da-yomi{font-size:9px;letter-spacing:.24em;color:var(--g45);
+  text-transform:lowercase;line-height:1.5}
+.ability-row span.da-yomi{font-size:9px;letter-spacing:.24em;color:var(--g45);
+  text-transform:lowercase;line-height:1.5}
+
+.deck-ab.r2 .da-main b{color:var(--green)}
+.deck-ab.r3 .da-main b{color:var(--ink)}
+.deck-ab.r3{box-shadow:inset 3px 0 0 var(--ink)}
+.deck-menu{margin-top:14px;border-bottom:0}
+#setup .menu,#deck .menu,#presets .menu{border-bottom:0;margin-top:26px}
+#setup .mi b,#deck .mi b,#presets .mi b{font-size:17px;letter-spacing:.24em}
+#setup .mi.primary b,#deck .mi.primary b{font-size:20px}
+#setup .mi,#deck .mi,#presets .mi{padding:14px 2px 13px}
+
+/* ---------- モーダル ---------- */
+.modal{position:fixed;inset:0;background:rgba(237,237,234,.9);display:flex;align-items:center;
+  justify-content:center;z-index:95;padding:24px}
+.modal-card{background:var(--paper);border:1px solid var(--ink);padding:28px 26px;
+  max-width:320px;width:100%}
+.modal-q{font-family:var(--mincho);font-size:16px;letter-spacing:.34em;margin-bottom:22px;font-weight:400}
+.modal-actions{display:flex;gap:0;margin-top:18px;flex-direction:column;
+  border-bottom:1px solid var(--g12)}
+.modal-actions .btn{justify-content:space-between}
+.set-row{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.set-row label{font-size:10.5px;letter-spacing:.18em;color:var(--g70);min-width:52px}
+.set-row b{font-size:10.5px;letter-spacing:.06em;color:var(--ink);min-width:26px;
+  text-align:right;font-weight:400}
+.set-row select{flex:1;font-family:var(--sans);font-size:11px;padding:8px 0;border-radius:0;
+  background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink)}
+.set-row input[type=range]{
+  flex:1;-webkit-appearance:none;appearance:none;height:20px;background:transparent;cursor:pointer;
+}
+.set-row input[type=range]::-webkit-slider-runnable-track{
+  height:3px;background:var(--g26);
+}
+.set-row input[type=range]::-moz-range-track{height:3px;background:var(--g26)}
+.set-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--glow-deep);margin-top:-6.5px;
+  transition:transform .12s var(--jelly);
+}
+.set-row input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border:0;border-radius:50%;background:var(--glow-deep);
+}
+.set-row input[type=range]:active::-webkit-slider-thumb{transform:scale(1.45)}
+
+.ability-list{display:flex;flex-direction:column;gap:0;max-height:52vh;overflow-y:auto}
+.ability-row{border-bottom:1px solid var(--g06);padding:9px 0;display:flex;flex-direction:column;gap:3px}
+.ability-row b{font-family:var(--mincho);font-size:12px;letter-spacing:.24em;font-weight:400}
+.ability-row span{font-size:10px;color:var(--g70);line-height:1.8}
+.ability-row.r2 b{color:var(--green)}
+.ability-row.r3 b{color:var(--ink)}
+.ability-row.r3{box-shadow:inset 4px 0 0 var(--ink)}
+
+.log{margin-top:22px;font-size:10.5px;line-height:1.95;color:var(--g70);min-height:2.6em;
+  letter-spacing:.1em;border-top:1px solid var(--g12);padding-top:14px}
+
+@media (prefers-reduced-motion:reduce){
+  .wordmark::before,.clock.collapse .clock-ticks b{animation:none}
+}
