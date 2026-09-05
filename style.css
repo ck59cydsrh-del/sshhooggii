@@ -221,25 +221,91 @@ body{
 .house-list li{font-size:10.5px;line-height:1.95;padding-left:16px;position:relative;letter-spacing:.03em;color:var(--g70)}
 .house-list li::before{content:"";position:absolute;left:0;top:.72em;width:8px;height:1px;background:var(--g26)}
 
+/* 手順の見出し */
+.step-head{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.24em;
+  color:var(--ink);margin:26px 0 10px}
+.step-head b{font-family:var(--didone);font-size:15px;font-weight:400;width:22px;height:22px;
+  display:grid;place-items:center;border:1px solid var(--ink);flex:none}
+.mode-menu{margin-top:0;border-bottom:1px solid var(--g12)}
+.mi.mode{opacity:.45}
+.mi.mode.on{opacity:1}
+.mi.mode.on .mi-no{color:var(--green)}
+.mi.mode.on .mi-rule{background:var(--g45)}
+.deck-step{font-size:10px;letter-spacing:.24em;color:var(--green);margin:-12px 0 20px}
+
+/* 開始前の編成お披露目 */
+#matchup{position:fixed;inset:0;z-index:90;background:var(--paper);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:24px;cursor:pointer;animation:muIn .3s linear}
+@keyframes muIn{from{opacity:0}to{opacity:1}}
+.mu-side{width:100%;max-width:330px;animation:muCard .4s var(--jelly) backwards}
+.mu-side:nth-child(3){animation-delay:.14s}
+@keyframes muCard{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.mu-name{display:flex;align-items:baseline;gap:10px;font-family:var(--mincho);font-size:19px;
+  letter-spacing:.16em;border-bottom:1px solid var(--ink);padding-bottom:7px;margin-bottom:10px}
+.mu-name span{font-size:11px;letter-spacing:.2em;color:var(--g45)}
+.mu-pieces{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.mu-val{font-size:10px;letter-spacing:.12em;color:var(--g45);margin-bottom:9px}
+.mu-abils{display:flex;flex-wrap:wrap;gap:6px 12px;min-height:14px}
+.mu-vs{font-family:var(--mincho);font-size:15px;letter-spacing:.3em;color:var(--g26)}
+
 /* ---------- はじめての説明 ---------- */
 .tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}
 .tut-note{font-size:10px;letter-spacing:.06em;color:var(--g45);text-align:center;line-height:1.7}
 .tut-text{font-size:12.5px;line-height:2.05;color:var(--g70);letter-spacing:.04em;margin-bottom:6px}
 .tut-text b{color:var(--ink);font-weight:400;box-shadow:inset 0 -6px 0 var(--green-soft)}
 
-/* 小さな盤の図。本体の盤と同じ語彙で描く */
-.mini{width:min(230px,72vw);height:auto;display:block}
-.mini.small{width:76px}
-.mini .m-grid{stroke:var(--g12);stroke-width:1}
-.mini .m-move,.mini .m-drop{fill:var(--glow);stroke:var(--ink);stroke-width:1}
-.mini .m-drop{opacity:.75}
-.mini .m-take{fill:none;stroke:var(--ink);stroke-width:2}
-.mini .m-pc{fill:var(--paper);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:miter}
-.mini .m-pc.gote{fill:var(--ink)}
-.mini .m-pc.pr{stroke:var(--green)}
-.mini .m-gl{font-family:var(--mincho);font-size:11px;fill:var(--ink)}
-.mini .m-gl.gote{fill:var(--paper)}
-.mini .m-gl.pr{fill:var(--green)}
+/* 小さな盤の図。本体の盤と同じ語彙で描く。
+   クラス名は .tfig。ボタンの .mini と衝突していたので分けてある */
+.tfig{width:min(230px,72vw);height:auto;display:block}
+.tfig.small{width:76px}
+.tfig.pair{width:min(148px,40vw)}
+.tfig .m-grid{stroke:var(--g12);stroke-width:1}
+.tfig .m-move,.tfig .m-drop{fill:var(--glow);stroke:var(--ink);stroke-width:1}
+.tfig .m-drop{opacity:.75}
+.tfig .m-base{fill:var(--paper);stroke:var(--ink);stroke-width:1.2}
+.tfig .m-take{fill:none;stroke:var(--ink);stroke-width:2}
+.tfig .m-land{fill:none;stroke:var(--green);stroke-width:2}
+.tfig .m-ruin{fill:var(--ink);stroke:none}   /* 本体の崩れたマスと同じ黒塗り */
+.tfig .m-arrow{stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;fill:none}
+.tfig .m-arrow-bg{stroke:var(--paper);stroke-width:4.2;stroke-linecap:round;fill:none}
+.tfig .m-arrow.dash{stroke-dasharray:3 2.5}
+.tfig .m-head{fill:var(--ink);stroke:var(--paper);stroke-width:1.5;paint-order:stroke;stroke-linejoin:round}
+.tfig .m-ghost{opacity:.3}
+.tfig .m-badge{fill:var(--paper);stroke:var(--ink);stroke-width:1}
+.tfig .m-badge-t{font-family:var(--sans);font-size:7px;fill:var(--ink)}
+.tfig .m-pc{fill:var(--paper);stroke:var(--ink);stroke-width:1.4;stroke-linejoin:miter}
+.tfig .m-pc.gote{fill:var(--ink)}
+.tfig .m-pc.pr{stroke:var(--green)}
+.tfig .m-gl{font-family:var(--mincho);font-size:11px;fill:var(--ink)}
+.tfig .m-gl.gote{fill:var(--paper)}
+.tfig .m-gl.pr{fill:var(--green)}
+
+/* 図に添える部品 — 持ち駒・手数・凡例 */
+.tf-row{display:flex;align-items:flex-start;justify-content:center;gap:9px}
+.tf-one{display:flex;flex-direction:column;align-items:center;gap:6px}
+.tf-then{font-size:11px;color:var(--g45);align-self:center;padding-top:14px}
+.tf-cap{font-size:9.5px;letter-spacing:.08em;color:var(--g45);text-align:center;line-height:1.5}
+.tf-tray{display:flex;align-items:center;gap:8px;margin-top:10px;
+  border-top:1px solid var(--g12);padding-top:9px;width:min(230px,72vw)}
+.tf-tray-l{font-size:9.5px;letter-spacing:.1em;color:var(--g45);white-space:nowrap}
+.tf-pcs{display:flex;align-items:center;gap:4px}
+.tf-pc{font-family:var(--mincho);font-size:11px;line-height:1;color:var(--ink);
+  border:1px solid var(--ink);padding:3px 4px 4px}
+.tf-pc.gote{background:var(--ink);color:var(--paper)}
+.tf-pc.new{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+.tf-plus{font-size:10px;color:var(--g45);margin:0 1px}
+.tf-meter{display:flex;align-items:center;gap:4px;font-size:9.5px;color:var(--g45);letter-spacing:.08em}
+.tf-meter i{width:7px;height:7px;border:1px solid var(--g45);display:inline-block}
+.tf-meter i.on{background:var(--ink);border-color:var(--ink)}
+.tf-meter i.on.warn{background:var(--green);border-color:var(--green)}
+.tf-meter b{font-weight:400;color:var(--ink);margin-left:2px}
+.tf-legend{display:flex;justify-content:center;gap:16px;margin-top:11px;font-size:9.5px;
+  letter-spacing:.06em;color:var(--g45)}
+.tf-legend span{display:flex;align-items:center;gap:5px}
+.tf-legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.tf-legend i.base{background:var(--paper);border:1px solid var(--ink)}
+.tf-legend i.move{background:var(--glow);border:1px solid var(--ink)}
 
 /* 駒の動き一覧 */
 .piece-guide{display:flex;flex-direction:column;gap:0;margin-top:6px}
@@ -318,6 +384,13 @@ body{
 .charge.hot i b{background:var(--green)}
 
 .ability-bar{display:flex;gap:0 16px;flex-wrap:wrap;padding-bottom:18px}
+/* 対戦中の能力表示。自分と相手を行で分ける */
+.ability-bar.vs-abils{flex-direction:column;gap:5px;padding-bottom:14px}
+.vs-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px 10px;
+  border-left:2px solid var(--g12);padding-left:9px}
+.vs-row.mine{border-left-color:var(--green)}
+.vs-who{font-family:var(--mincho);font-size:11px;letter-spacing:.14em;color:var(--g45);min-width:14px}
+.vs-row.mine .vs-who{color:var(--green)}
 .chip{font-size:10px;letter-spacing:.12em;cursor:pointer;white-space:nowrap;
   border:0;color:var(--g45);background:transparent;padding:0;
   display:inline-flex;align-items:center;gap:4px}
@@ -392,6 +465,9 @@ body.fever .cell.move::after{background:var(--glow-hi)}
 .pc polygon{fill:var(--paper);stroke:var(--ink);stroke-width:2.4;stroke-linejoin:miter}
 .pc text{font-family:var(--mincho);font-size:54px;font-weight:400;fill:var(--ink)}
 .pc.gote{transform:rotate(180deg)}
+/* 盤を反転しているときは、向きも入れ替える(自分の駒が常に正立) */
+body.flipped .pc.gote{transform:none}
+body.flipped .pc:not(.gote){transform:rotate(180deg)}
 .pc.gote polygon{fill:var(--ink)}
 .pc.gote text{fill:var(--paper)}
 .pc.pr polygon{stroke:var(--green)}
@@ -403,6 +479,8 @@ body.fever .cell.move::after{background:var(--glow-hi)}
    後手用に回転込みのkeyframesを別に用意する。 */
 .pc.placed{animation:jelly .42s var(--jelly)}
 .pc.gote.placed{animation:jellyGote .42s var(--jelly)}
+body.flipped .pc.gote.placed{animation:jelly .42s var(--jelly)}
+body.flipped .pc:not(.gote).placed{animation:jellyGote .42s var(--jelly)}
 @keyframes jellyGote{
   0%{transform:rotate(180deg) scale(1,1)}
   26%{transform:rotate(180deg) scale(1.1,.88)}
@@ -413,6 +491,8 @@ body.fever .cell.move::after{background:var(--glow-hi)}
 .pc.hand{width:30px;height:33px;cursor:pointer;transition:transform .1s var(--jelly-soft)}
 .pc.hand:active{transform:scale(.86,1.16)}
 .pc.gote.hand:active{transform:rotate(180deg) scale(.86,1.16)}
+body.flipped .pc.gote.hand:active{transform:scale(.86,1.16)}
+body.flipped .pc:not(.gote).hand:active{transform:rotate(180deg) scale(.86,1.16)}
 .pc.hand.selected polygon{stroke-width:4}
 
 /* ---------- 演出: ここだけ大きさと色が出る ---------- */

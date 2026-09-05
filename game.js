@@ -203,12 +203,16 @@ const VS_ABILITIES = ABILITIES.filter(a => VS_OK.has(a.id));
    1手の価値が固定の対人戦では、手番が2回来る効果は釣り合いを壊す。 */
 
 /* デッキ構築: 並2 / 希4 / 極10、予算10、枠5。修得済みは1安い */
-const AB_COST = { 1:2, 2:4, 3:10 };
+/* 既定編成 = 25種すべてから選べるが高い。
+   潜って持ち帰った編成 = 修得したものだけだが、ひとつずつが大幅に安い。
+   「広さ」と「深さ」の取引にしてある。 */
+const AB_COST      = { 1:2, 2:4, 3:10 };   // 既定編成
+const AB_COST_DIVE = { 1:1, 2:2, 3:5  };   // 潜って持ち帰った編成
 const DECK_BUDGET = 10, DECK_SLOTS = 5, DECK_PIECES = 10;
-const abCost = (a, earned) => Math.max(1, AB_COST[a.r] - (earned ? 1 : 0));
-const deckCost = (abils, earned) =>
+const abCost = (a, dive) => (dive ? AB_COST_DIVE : AB_COST)[a.r];
+const deckCost = (abils, dive) =>
   Object.keys(abils).reduce((s, id) =>
-    s + (ABI_BY_ID[id] ? abCost(ABI_BY_ID[id], earned && earned[id]) : 0), 0);
+    s + (ABI_BY_ID[id] ? abCost(ABI_BY_ID[id], dive) : 0), 0);
 const rndPiece = () => ['P','P','L','N','S','G','B','R'][(Math.random()*8)|0];
 function addPool(r, obj) { for (const t in obj) r.pool[t] = (r.pool[t] || 0) + obj[t]; }
 
@@ -1051,25 +1055,49 @@ function humanControls(o) {
   if (net.on) return o === net.seat;      // 通信対戦では自分の側だけ動かせる
   return o === SENTE || !goteIsCPU;
 }
+let axisFlipped = null;
 function renderAxis() {
-  const f = $('files'), r = $('ranks');
-  if (f.childElementCount) return;
-  for (let c = 0; c < C; c++) { const s = document.createElement('span'); s.textContent = C - c; f.appendChild(s); }
-  for (let i = 0; i < R; i++) { const s = document.createElement('span'); s.textContent = KAN[i]; r.appendChild(s); }
+  const f = $('files'), r = $('ranks'), fl = flipped();
+  if (f.childElementCount && axisFlipped === fl) return;
+  axisFlipped = fl;
+  f.innerHTML = ''; r.innerHTML = '';
+  for (let c = 0; c < C; c++) {
+    const e = document.createElement('span');
+    e.textContent = fl ? c + 1 : C - c;         // 反転すると筋の並びも逆になる
+    f.appendChild(e);
+  }
+  for (let i = 0; i < R; i++) {
+    const e = document.createElement('span');
+    e.textContent = KAN[fl ? R - 1 - i : i];
+    r.appendChild(e);
+  }
 }
+
+/* 自分の駒が常に手前に来るようにする。通信対戦で後手を持つと
+   盤が上下逆になり、端末を回さないと指せなかった。 */
+function myView() {
+  if (mode === 'versus' && net.on) return net.seat;   // 通信では自分の席が手前
+  return SENTE;                                        // それ以外は先手が手前
+}
+const flipped = () => myView() === GOTE;
+/* 画面の並び順 d ↔ 盤の位置 i */
+const viewToBoard = d => (flipped() ? NS - 1 - d : d);
 
 function render() {
   renderAxis();
   const board = $('board');
   board.innerHTML = '';
   const active = humanControls(pos.turn) && !busy;
+  document.body.classList.toggle('flipped', flipped());
 
-  for (let i = 0; i < NS; i++) {
+  for (let d = 0; d < NS; d++) {
+    const i = viewToBoard(d);
     const cell = document.createElement('div');
     cell.className = 'cell';
+    const me = myView(), foe = other(me);
     if (pos.blocked.has(i)) cell.classList.add('blocked');
-    else if (inZone(rowOf(i), SENTE)) cell.classList.add('zone');
-    else if (inZone(rowOf(i), GOTE)) cell.classList.add('zone', 'zone-foe');
+    else if (inZone(rowOf(i), me)) cell.classList.add('zone');        // 自分の成り域
+    else if (inZone(rowOf(i), foe)) cell.classList.add('zone', 'zone-foe');
     if (legal.includes(i)) {
       cell.classList.add('clickable', pos.b[i] ? 'capture' : 'move');
     }
@@ -1083,7 +1111,11 @@ function render() {
     board.appendChild(cell);
   }
 
-  renderHand('s'); renderHand('g');
+  // 手前が自分、奥が相手になるようトレイも入れ替える
+  const meTray = flipped() ? 'g' : 's', foeTray = flipped() ? 's' : 'g';
+  renderHand(meTray, 'hand-s'); renderHand(foeTray, 'hand-g');
+  document.querySelector('.tray-self .tray-label').textContent = '自';
+  document.querySelector('.tray-enemy .tray-label').textContent = '敵';
   renderAbilityBar(); renderCharges(); renderClock();
 
   if (mode === 'solo') {
@@ -1102,8 +1134,8 @@ function render() {
   }
 }
 
-function renderHand(side) {
-  const row = $(side === 's' ? 'hand-s' : 'hand-g');
+function renderHand(side, into) {
+  const row = $(into || (side === 's' ? 'hand-s' : 'hand-g'));
   row.innerHTML = '';
   const hand = pos.h[side], owner = side === 's' ? SENTE : GOTE;
   const entries = HAND_ORDER.filter(t => hand[t] > 0);
@@ -1133,6 +1165,7 @@ function renderHand(side) {
 function renderAbilityBar() {
   const bar = $('ability-bar');
   bar.innerHTML = '';
+  if (mode === 'versus') return renderVersusAbilities(bar);
   const my = sideAb[SENTE];
   const ids = Object.keys(my).filter(id => my[id] > 0);
   if (!ids.length) { bar.classList.add('hidden'); return; }
@@ -1169,6 +1202,30 @@ function renderClock() {
     const b = document.createElement('b');
     if (i >= Math.ceil(Math.max(left,0) / scale)) b.className = 'spent';
     ticks.appendChild(b);
+  }
+}
+
+/* 対戦では両者の能力を並べて出す。相手が何を積んでいるか常に見える */
+function renderVersusAbilities(bar) {
+  bar.classList.remove('hidden');
+  bar.classList.add('vs-abils');
+  const me = myView(), foe = other(me);
+  for (const [side, label] of [[me, '自'], [foe, '敵']]) {
+    const ids = Object.keys(sideAb[side]).filter(id => sideAb[side][id] > 0);
+    const row = document.createElement('div');
+    row.className = 'vs-row' + (side === me ? ' mine' : '');
+    row.innerHTML = `<span class="vs-who">${label}</span>`;
+    if (!ids.length) row.innerHTML += '<span class="ap-none">なし</span>';
+    for (const id of ids) {
+      const a = ABI_BY_ID[id]; if (!a) continue;
+      const c = document.createElement('span');
+      c.className = 'chip r' + a.r;
+      c.innerHTML = `<i>${RARITY[a.r]}</i>${a.n}`;
+      c.title = a.d;
+      c.addEventListener('click', () => openAbilityList(side));
+      row.appendChild(c);
+    }
+    bar.appendChild(row);
   }
 }
 
@@ -1734,10 +1791,14 @@ function takeAbility(a) {
   afterDraft = null;
   if (next) next();
 }
-function openAbilityList() {
+function openAbilityList(side) {
   const box = $('ability-list');
   box.innerHTML = '';
-  const my = sideAb[SENTE];
+  const who = side || SENTE;
+  const my = sideAb[who];
+  const head = $('ability-modal').querySelector('.tag');
+  if (head) head.textContent = mode === 'versus'
+    ? (who === myView() ? '自分の能力' : '相手の能力') : 'abilities';
   for (const id of Object.keys(my)) {
     const a = ABI_BY_ID[id]; if (!a || !my[id]) continue;
     const row = document.createElement('div');
@@ -1787,12 +1848,12 @@ function toTitle() {
   gen++;
   busy = false;
   $('btn-presets-back').classList.remove('danger');
-  ['game','setup','presets','deck'].forEach(id => $(id).classList.add('hidden'));
+  ['game','setup','presets','deck','tutorial'].forEach(id => $(id).classList.add('hidden'));
   $('title').classList.remove('hidden');
   showBest();
 }
 function toGame() {
-  ['title','setup','presets','deck'].forEach(id => $(id).classList.add('hidden'));
+  ['title','setup','presets','deck','tutorial'].forEach(id => $(id).classList.add('hidden'));
   $('game').classList.remove('hidden');
 }
 function showBest() {
@@ -1932,7 +1993,7 @@ function pickSide(sel) {
 /* ============================================================
    デッキ構築
    ============================================================ */
-let deckEdit = null, deckFilter = null;
+let deckEdit = null, deckFilter = null, deckStep = 'pieces';
 
 const poolTotal = pool => Object.values(pool).reduce((a,b) => a+b, 0);
 
@@ -1948,13 +2009,13 @@ function autoPieces(src) {
 
 /* おまかせ。修得済みを厚めに引きつつ毎回ばらけるよう、重み付きで抽選する。
    最後に余った予算は安いもので埋めて必ず使い切る。 */
-function autoAbilities(earned) {
+function autoAbilities(pool0, dive) {
   const chosen = {};
-  const weight = a => (earned[a.id] ? 6 : 1) * (a.r === 3 ? 1 : a.r === 2 ? 2 : 3);
-  const pool = VS_ABILITIES.filter(a => !a.req);
+  const weight = a => (a.r === 3 ? 1 : a.r === 2 ? 2 : 3);
+  const pool = pool0.filter(a => !a.req);
   const fits = (id) => {
     if (chosen[id] || Object.keys(chosen).length >= DECK_SLOTS) return false;
-    return deckCost({ ...chosen, [id]:1 }, earned) <= DECK_BUDGET;
+    return deckCost({ ...chosen, [id]:1 }, dive) <= DECK_BUDGET;
   };
   for (let guard = 0; guard < 60; guard++) {
     const avail = pool.filter(a => fits(a.id));
@@ -1963,23 +2024,27 @@ function autoAbilities(earned) {
     let x = Math.random() * total, k = 0;
     for (; k < avail.length - 1; k++) { x -= weight(avail[k]); if (x <= 0) break; }
     chosen[avail[k].id] = 1;
-    // 前提つき(連撃改・影武者衆)は親を取った直後に抽選対象へ
-    for (const dep of VS_ABILITIES)
+    // 前提つき(影武者衆)は親を取った直後に抽選対象へ
+    for (const dep of pool0)
       if (dep.req === avail[k].id && Math.random() < 0.5 && fits(dep.id)) chosen[dep.id] = 1;
   }
   return chosen;
 }
 
 function openDeck(side, src, next) {
+  const dive = !!src.editable;                  // 潜って持ち帰った編成か
   const earned = {};
   for (const id in (src.abilities || {})) if (VS_OK.has(id)) earned[id] = 1;
+  // 潜った編成は修得したものだけ。既定編成は全部から選べる
+  const choosable = dive ? VS_ABILITIES.filter(a => earned[a.id]) : VS_ABILITIES;
   deckFilter = null;
+  deckStep = 'pieces';
   deckEdit = {
-    side, src, next, earned,
-    fixed: !src.editable,                       // 既定編成は駒を固定
+    side, src, next, earned, dive, choosable,
+    fixed: !dive,                               // 既定編成は駒を固定
     available: { ...src.pool },
-    pieces: src.editable ? autoPieces(src.pool) : { ...src.pool },
-    abilities: autoAbilities(earned),
+    pieces: dive ? autoPieces(src.pool) : { ...src.pool },
+    abilities: autoAbilities(choosable, dive),
   };
   ['title','game','setup','presets'].forEach(id => $(id).classList.add('hidden'));
   $('deck').classList.remove('hidden');
@@ -2031,7 +2096,7 @@ function renderDeck() {
     box.appendChild(row);
   }
 
-  const cost = deckCost(d.abilities, d.earned);
+  const cost = deckCost(d.abilities, d.dive);
   const slots = Object.keys(d.abilities).length;
   $('deck-cost').innerHTML =
     `コスト <b class="${cost >= DECK_BUDGET ? 'full' : ''}">${cost}</b> / ${DECK_BUDGET}` +
@@ -2047,7 +2112,7 @@ function renderDeck() {
   // 分類の絞り込み
   const fbox = $('deck-filter');
   fbox.innerHTML = '';
-  const cats = [...new Set(VS_ABILITIES.map(a => catOf(a.id)))];
+  const cats = [...new Set(d.choosable.map(a => catOf(a.id)))];
   for (const c of [null, ...cats]) {
     const b = document.createElement('button');
     b.className = 'fchip' + (deckFilter === c ? ' on' : '');
@@ -2059,7 +2124,7 @@ function renderDeck() {
   const list = $('deck-abilities');
   list.innerHTML = '';
   // 選んだものを先頭に固定して、いま何を積んでいるかが常に見えるようにする
-  const sorted = VS_ABILITIES.slice()
+  const sorted = d.choosable.slice()
     .filter(a => d.abilities[a.id] || !deckFilter || catOf(a.id) === deckFilter)
     .sort((a, b) => {
       const sa = d.abilities[a.id] ? 1 : 0, sb = d.abilities[b.id] ? 1 : 0;
@@ -2070,7 +2135,7 @@ function renderDeck() {
     });
   for (const a of sorted) {
     const on = !!d.abilities[a.id];
-    const c = abCost(a, d.earned[a.id]);
+    const c = abCost(a, d.dive);
     const wouldCost = cost + c;
     const blockedReq = a.req && !d.abilities[a.req];
     const cannot = !on && (wouldCost > DECK_BUDGET || slots >= DECK_SLOTS || blockedReq);
@@ -2083,7 +2148,7 @@ function renderDeck() {
         `<span class="da-head">` +
           `<span class="da-badge">${RARITY[a.r]}</span>` +
           `<span class="da-cat">${catOf(a.id)}</span>` +
-          (d.earned[a.id] ? `<span class="da-earned">修得</span>` : '') +
+          (d.dive ? `<span class="da-earned">修得</span>` : '') +
         `</span>` +
         `<b>${a.n}</b><span class="da-yomi">${yomi(a.id)}</span>` +
         `<span class="da-desc">${a.d}</span>` +
@@ -2092,14 +2157,24 @@ function renderDeck() {
     row.addEventListener('click', () => {
       if (on) {
         delete d.abilities[a.id];
-        for (const dep of VS_ABILITIES)            // 前提を外したら依存も外す
+        for (const dep of d.choosable)             // 前提を外したら依存も外す
           if (dep.req === a.id) delete d.abilities[dep.id];
       } else if (!cannot) d.abilities[a.id] = 1;
       renderDeck();
     });
     list.appendChild(row);
   }
-  $('btn-deck-ok').classList.toggle('disabled', poolTotal(d.pieces) === 0);
+  // 手順(駒 → 能力)の出し分け
+  const onPieces = deckStep === 'pieces';
+  $('deck-sec-pieces').classList.toggle('hidden', !onPieces);
+  $('deck-sec-abils').classList.toggle('hidden', onPieces);
+  $('btn-deck-auto').classList.toggle('hidden', onPieces && d.fixed);
+  $('btn-deck-ok').querySelector('b').textContent = onPieces ? 'つぎへ' : '決　定';
+  $('btn-deck-ok').querySelector('.mi-sub').textContent =
+    onPieces ? '能力を選ぶ' : 'この編成で始める';
+  const short = poolTotal(d.pieces) !== DECK_PIECES && !d.fixed;
+  $('btn-deck-ok').classList.toggle('disabled', onPieces ? short : poolTotal(d.pieces) === 0);
+  $('deck-step').textContent = onPieces ? '1 / 2　駒をえらぶ' : '2 / 2　能力をえらぶ';
 }
 
 $('btn-pc-auto').addEventListener('click', () => {
@@ -2110,15 +2185,23 @@ $('btn-pc-clear').addEventListener('click', () => {
 });
 $('btn-deck-auto').addEventListener('click', () => {
   const d = deckEdit;
-  if (!d.fixed) d.pieces = autoPieces(d.available);
-  d.abilities = autoAbilities(d.earned);
+  sfx.ui();
+  if (deckStep === 'pieces') { if (!d.fixed) d.pieces = autoPieces(d.available); }
+  else d.abilities = autoAbilities(d.choosable, d.dive);
   renderDeck();
 });
-$('btn-deck-back').addEventListener('click', openSetup);
+$('btn-deck-back').addEventListener('click', () => {
+  if (deckStep === 'abils') { deckStep = 'pieces'; sfx.ui(); renderDeck(); }
+  else openSetup();
+});
 $('btn-deck-ok').addEventListener('click', () => {
   const d = deckEdit;
+  if (deckStep === 'pieces') {
+    if (!d.fixed && poolTotal(d.pieces) !== DECK_PIECES) return;
+    deckStep = 'abils'; sfx.ui(); renderDeck(); window.scrollTo(0, 0); return;
+  }
   if (!poolTotal(d.pieces)) return;
-  d.next({ name: d.src.name, pool: { ...d.pieces }, abilities: { ...d.abilities } });
+  d.next({ name: d.src.name, pool: { ...d.pieces }, abilities: { ...d.abilities }, dive: d.dive });
 });
 
 /* 対戦画面で編成の中身を見せる。selectだけだと何が入っているか分からない */
@@ -2173,78 +2256,123 @@ function openSetup() {
   fillSelect($('sel-sente')); fillSelect($('sel-gote'));
   $('sel-sente').value = 'b0';
   $('sel-gote').value  = 'b1';
+  applyVsMode();
   renderArmy('sel-sente', 'pieces-sente', 'abils-sente', 'note-sente');
   renderArmy('sel-gote', 'pieces-gote', 'abils-gote', 'note-gote');
 }
 $('sel-sente').addEventListener('change', () => { renderArmy('sel-sente','pieces-sente','abils-sente','note-sente'); sfx.ui(); });
 $('sel-gote').addEventListener('change',  () => { renderArmy('sel-gote','pieces-gote','abils-gote','note-gote'); sfx.ui(); });
 /* 先手→後手の順に編成させてから開始。CPU側は自動で組む */
-$('sel-gote-ctrl').addEventListener('change', e => {
-  const v = e.target.value, isNet = v === 'net' || v === 'p2p';
+let vsMode = 'cpu';        // cpu / hotseat / p2p / net
+
+function applyVsMode() {
+  const isNet = vsMode === 'p2p' || vsMode === 'net';
   $('net-box').classList.toggle('hidden', !isNet);
-  if (!isNet) return;
-  if (v === 'net') {
-    $('net-url').textContent = location.origin.replace('localhost', '(この端末のIP)');
-    $('net-hint').textContent = 'serve.py で起動している必要があります。インターネットは使いません。';
-    netStatus('同じWi-Fiの2台で、同じ合言葉を入れてください。');
-  } else {
+  // 後手の編成を選べるのは、この端末で2人が指すときだけ
+  $('gote-pick').classList.toggle('hidden', vsMode !== 'hotseat');
+  $('side-label').textContent = vsMode === 'hotseat' ? '▲ 先手' : '自分';
+  $('setup-hint').innerHTML =
+    vsMode === 'cpu'     ? '相手の編成はその場でランダムに決まります。先に2勝した方の勝ち。'
+  : vsMode === 'hotseat' ? '同じ端末を渡しながら指します。両方の編成をここで選びます。'
+  : vsMode === 'p2p'     ? '2台で同じ合言葉を入れます。<b>先手側が先にすすんで</b>ください。'
+  :                        'serve.py で起動した端末どうしで繋ぎます。回線は使いません。';
+  if (vsMode === 'p2p') {
     $('net-url').textContent = '';
-    $('net-hint').textContent = '公開の中継所を経由してブラウザ同士を直結します。離れた場所とも遊べます。';
-    netStatus('2台で同じ合言葉を入れてください。先手側が先に開始してください。');
+    $('net-hint').textContent = 'ブラウザ同士を直接つなぎます。離れた場所とも遊べます。';
+    netStatus('2台で同じ合言葉を入れてください。');
+  } else if (vsMode === 'net') {
+    $('net-url').textContent = location.origin.replace('localhost', '(この端末のIP)');
+    $('net-hint').textContent = 'serve.py で起動している必要があります。';
+    netStatus('同じWi-Fiの2台で、同じ合言葉を入れてください。');
   }
+}
+$('mode-menu').addEventListener('click', e => {
+  const b = e.target.closest('.mode');
+  if (!b) return;
+  vsMode = b.dataset.mode;
+  [...$('mode-menu').children].forEach(c => c.classList.toggle('on', c === b));
+  sfx.ui();
+  applyVsMode();
 });
 
-$('btn-setup-start').addEventListener('click', async () => {
-  const srcS = pickSide($('sel-sente')), srcG = pickSide($('sel-gote'));
-  const ctrl = $('sel-gote-ctrl').value;
-  const cpu = ctrl === 'cpu';
+$('sel-sente').addEventListener('change', () => { renderArmy('sel-sente','pieces-sente','abils-sente','note-sente'); sfx.ui(); });
+$('sel-gote').addEventListener('change',  () => { renderArmy('sel-gote','pieces-gote','abils-gote','note-gote'); sfx.ui(); });
 
-  // 別の端末と繋ぐ場合は、先に部屋へ入ってから編成に進む
-  if (ctrl === 'net' || ctrl === 'p2p') {
+/* 開始前に、両者の編成を見せる */
+function showMatchup(a, b, then) {
+  const box = $('matchup');
+  const card = (side, d) => {
+    const abils = Object.keys(d.abilities || {}).map(id => {
+      const x = ABI_BY_ID[id];
+      return `<span class="chip r${x.r}"><i>${RARITY[x.r]}</i>${x.n}</span>`;
+    }).join('') || '<span class="ap-none">能力なし</span>';
+    const pieces = HAND_ORDER.filter(t => d.pool[t]).map(t =>
+      `<span class="ap"><b>${NAME[t]}</b>${d.pool[t] > 1 ? `<i>${d.pool[t]}</i>` : ''}</span>`).join('');
+    const val = Object.entries(d.pool).reduce((v, [t, n]) => v + VAL[t]*n, 0);
+    return `<div class="mu-side"><p class="mu-name"><span>${side}</span>${d.name}</p>` +
+           `<div class="mu-pieces">${pieces}</div>` +
+           `<p class="mu-val">${poolTotal(d.pool)}枚 / 価値 ${val.toLocaleString('ja-JP')}</p>` +
+           `<div class="mu-abils">${abils}</div></div>`;
+  };
+  box.innerHTML = card('▲ 先手', a) + '<div class="mu-vs">対</div>' + card('△ 後手', b);
+  box.classList.remove('hidden');
+  sfx.clear();
+  const go = () => { box.classList.add('hidden'); box.removeEventListener('click', go); then(); };
+  box.addEventListener('click', go);
+  setTimeout(go, 4200);            // 触らなくても進む
+}
+
+$('btn-setup-start').addEventListener('click', async () => {
+  const srcS = pickSide($('sel-sente'));
+  const srcG = vsMode === 'hotseat' ? pickSide($('sel-gote')) : null;
+  const cpu = vsMode === 'cpu';
+
+  const autoBuild = src => {
+    const dive = !!src.editable;
+    const earned = {};
+    for (const id in (src.abilities || {})) if (VS_OK.has(id)) earned[id] = 1;
+    const pool = dive ? VS_ABILITIES.filter(a => earned[a.id]) : VS_ABILITIES;
+    return { name:src.name, pool: dive ? autoPieces(src.pool) : { ...src.pool },
+             abilities: autoAbilities(pool.length ? pool : VS_ABILITIES, dive) };
+  };
+  // CPUの編成はその場でランダムに決める
+  const randomFoe = () => {
+    const b = BUILTIN[(Math.random() * BUILTIN.length) | 0];
+    return autoBuild(b);
+  };
+
+  if (vsMode === 'p2p' || vsMode === 'net') {
     const room = ($('net-room').value || '').trim().toUpperCase();
     if (!room) { netStatus('合言葉を入れてください。', 'bad'); return; }
     net.room = room; net.seat = $('net-seat').value; net.token = netToken();
-    net.mode = ctrl === 'p2p' ? 'p2p' : 'lan';
+    net.mode = vsMode === 'p2p' ? 'p2p' : 'lan';
     netStatus('つないでいます…');
     if (net.mode === 'p2p') {
-      try {
-        await p2pConnect(room, net.seat);
-        net.on = true;
-      } catch (e) {
+      try { await p2pConnect(room, net.seat); net.on = true; }
+      catch (e) {
         const m = String(e.message);
         netStatus(
-          m === 'room-taken' ? 'その合言葉は先手側が既に使っています。後手を選んでください。'
-          : m === 'no-host'  ? '先手側が見つかりません。先に先手側で開始してください。'
-          : m === 'peerjs-missing' ? '通信部品を読み込めませんでした。オンラインに繋がっているか確認してください。'
+          m === 'room-taken' ? 'その合言葉は先手側が使っています。後手を選んでください。'
+          : m === 'no-host'  ? '先手側が見つかりません。先に先手側ですすんでください。'
+          : m === 'peerjs-missing' ? '通信部品を読み込めませんでした。'
           : '繋がりませんでした。合言葉と回線を確認してください。', 'bad');
         return;
       }
     } else {
       try {
         const r = await netCall(`/api/join?room=${encodeURIComponent(room)}&seat=${net.seat}&token=${net.token}`);
-        if (!r.ok) { netStatus('その席は相手が使っています。もう片方を選んでください。', 'bad'); return; }
+        if (!r.ok) { netStatus('その席は相手が使っています。', 'bad'); return; }
         net.on = true; net.since = r.count || 0;
-        netStatus(`部屋「${room}」に入りました。相手を待っています。`, 'good');
+        netStatus(`部屋「${room}」に入りました。`, 'good');
         netPoll();
-      } catch (e) {
-        netStatus('中継所に届きません。serve.py で起動してください。', 'bad');
-        return;
-      }
+      } catch (e) { netStatus('中継所に届きません。serve.py で起動してください。', 'bad'); return; }
     }
   } else { net.on = false; net.mode = 'lan'; }
 
-  const autoBuild = src => {
-    const earned = {};
-    for (const id in (src.abilities || {})) if (VS_OK.has(id)) earned[id] = 1;
-    return { name:src.name,
-             pool: src.editable ? autoPieces(src.pool) : { ...src.pool },
-             abilities: autoAbilities(earned) };
-  };
-  // 通信対戦は自分の側だけ組み、相手の編成は中継所から受け取る
+  // 通信対戦は自分の側だけ組み、相手の編成は受け取る
   if (net.on) {
-    const mySrc = net.seat === SENTE ? srcS : srcG;
-    openDeck(net.seat, mySrc, async deck => {
-      const foe = other(net.seat);      // グローバルの other() を隠さないよう別名にする
+    openDeck(net.seat, srcS, async deck => {
+      const foe = other(net.seat);
       netStatus('相手の編成を待っています…');
       let meta = null;
       if (net.mode === 'p2p') {
@@ -2256,27 +2384,30 @@ $('btn-setup-start').addEventListener('click', async () => {
         }
       } else {
         await netCall('/api/meta', { room: net.room, meta: { [net.seat]: deck } }).catch(() => {});
-        for (let i = 0; i < 120 && !meta; i++) {                 // 相手が組み終わるまで待つ
+        for (let i = 0; i < 120 && !meta; i++) {
           const r = await netCall(`/api/join?room=${encodeURIComponent(net.room)}&seat=${net.seat}&token=${net.token}`).catch(() => null);
           if (r && r.meta && r.meta[foe]) meta = r.meta;
           if (!meta) await new Promise(z => setTimeout(z, 700));
         }
       }
-      const mine = deck;
-      const theirs = (meta && meta[foe]) || autoBuild(net.seat === SENTE ? srcG : srcS);
-      lastVersus = net.seat === SENTE ? { s:mine, g:theirs } : { s:theirs, g:mine };
+      const theirs = (meta && meta[foe]) || randomFoe();
+      lastVersus = net.seat === SENTE ? { s:deck, g:theirs } : { s:theirs, g:deck };
       toGame();
-      startMatch(lastVersus.s, lastVersus.g, false);
+      showMatchup(lastVersus.s, lastVersus.g, () => startMatch(lastVersus.s, lastVersus.g, false));
     });
     return;
   }
 
   openDeck(SENTE, srcS, deckS => {
-    if (cpu) { lastVersus = { s:deckS, g:autoBuild(srcG) }; toGame(); return startMatch(deckS, lastVersus.g, true); }
+    if (cpu) {
+      lastVersus = { s:deckS, g:randomFoe() };
+      toGame();
+      return showMatchup(lastVersus.s, lastVersus.g, () => startMatch(lastVersus.s, lastVersus.g, true));
+    }
     openDeck(GOTE, srcG, deckG => {
       lastVersus = { s:deckS, g:deckG };
       toGame();
-      startMatch(deckS, deckG, false);
+      showMatchup(deckS, deckG, () => startMatch(deckS, deckG, false));
     });
   });
 });
@@ -2422,34 +2553,107 @@ function p2pConnect(code, seat) {
 /* ============================================================
    はじめての説明。文章を減らし、盤の図で見せる。
    ============================================================ */
-/* 任意の盤面を小さく描く。cells は {i:{t,o,pr}}、marks は {i:'move'|'take'|'drop'} */
+/* 説明用の小さな盤。本体の盤と同じ語彙で描く。
+   静止した盤に印を置くだけでは「どの駒がどこへ動いて取ったのか」が
+   読めなかったので、矢印と手順番号を描けるようにしてある。 */
 function miniBoard(cells, marks, opt) {
-  const cell = 22, pad = 1, W = pad*2 + C*cell;
+  opt = opt || {};
+  const cell = 22, pad = 1, W = pad * 2 + C * cell, H = pad * 2 + R * cell;
+  const cx = i => pad + (i % C) * cell + cell / 2;
+  const cy = i => pad + ((i / C) | 0) * cell + cell / 2;
+
   let g = '';
   for (let i = 0; i <= C; i++) {
     g += `<line class="m-grid" x1="${pad}" y1="${pad+i*cell}" x2="${pad+C*cell}" y2="${pad+i*cell}"/>`;
     g += `<line class="m-grid" x1="${pad+i*cell}" y1="${pad}" x2="${pad+i*cell}" y2="${pad+R*cell}"/>`;
   }
+
   let m = '';
   for (const k in (marks || {})) {
     const i = +k, x = pad + (i % C) * cell, y = pad + ((i / C) | 0) * cell;
     const kind = marks[k];
-    if (kind === 'take') m += `<rect class="m-take" x="${x+1}" y="${y+1}" width="${cell-2}" height="${cell-2}"/>`;
-    else m += `<circle class="m-${kind}" cx="${x+cell/2}" cy="${y+cell/2}" r="${cell*0.20}"/>`;
+    if (kind === 'take' || kind === 'land')   // 駒の外側を囲まないと黒い駒の上で枠が消える
+      m += `<rect class="m-${kind}" x="${x+1}" y="${y+1}" width="${cell-2}" height="${cell-2}"/>`;
+    else if (kind === 'ruin')
+      m += `<rect class="m-ruin" x="${x+1}" y="${y+1}" width="${cell-2}" height="${cell-2}"/>`;
+    else m += `<circle class="m-${kind}" cx="${cx(i)}" cy="${cy(i)}" r="${cell*(kind==='base'?0.15:0.20)}"/>`;
   }
+
+  /* 矢印。隣り合うマスだと駒の外には線を引く余地がないので、
+     駒の上に重ねて描き、紙色の縁で抜いて読めるようにする */
+  let a = '';
+  for (const ar of (opt.arrows || [])) {
+    const x1 = cx(ar.from), y1 = cy(ar.from), x2 = cx(ar.to), y2 = cy(ar.to);
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const off = Math.min(cell * 0.24, len * 0.24);
+    const tipX = x2 - ux * off, tipY = y2 - uy * off;
+    const hl = 6.2, hw = 3.8;
+    const bx = tipX - ux * hl, by = tipY - uy * hl;
+    const px = -uy, py = ux;
+    const seg = `x1="${(x1+ux*off).toFixed(1)}" y1="${(y1+uy*off).toFixed(1)}" `
+              + `x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"`;
+    a += `<line class="m-arrow-bg" ${seg}/>`
+       + `<line class="m-arrow${ar.dash ? ' dash' : ''}" ${seg}/>`
+       + `<polygon class="m-head" points="${tipX.toFixed(1)},${tipY.toFixed(1)} `
+       + `${(bx+px*hw).toFixed(1)},${(by+py*hw).toFixed(1)} `
+       + `${(bx-px*hw).toFixed(1)},${(by-py*hw).toFixed(1)}"/>`;
+  }
+
   let p = '';
   for (const k in (cells || {})) {
     const i = +k, c = cells[k];
     const x = pad + (i % C) * cell, y = pad + ((i / C) | 0) * cell;
     const gl = c.pr ? PGLYPH[c.t] : (c.t === 'K' && c.o === GOTE ? '玉' : GLYPH[c.t]);
-    p += `<g transform="translate(${x},${y})${c.o === GOTE ? ` rotate(180 ${cell/2} ${cell/2})` : ''}">` +
+    p += `<g class="${c.ghost ? 'm-ghost' : ''}" transform="translate(${x},${y})${c.o === GOTE ? ` rotate(180 ${cell/2} ${cell/2})` : ''}">` +
          `<polygon class="m-pc ${c.o === GOTE ? 'gote' : ''} ${c.pr ? 'pr' : ''}" points="${
             [[cell*0.5,cell*0.08],[cell*0.86,cell*0.24],[cell*0.95,cell*0.94],[cell*0.05,cell*0.94],[cell*0.14,cell*0.24]]
             .map(v => v.map(n => n.toFixed(1)).join(',')).join(' ')}"/>` +
          `<text class="m-gl ${c.pr ? 'pr' : ''} ${c.o === GOTE ? 'gote' : ''}" x="${cell/2}" y="${cell*0.58}" ` +
          `text-anchor="middle" dominant-baseline="central">${gl}</text></g>`;
   }
-  return `<svg class="mini ${opt && opt.cls || ''}" viewBox="0 0 ${W} ${pad*2+R*cell}">${g}${m}${p}</svg>`;
+
+  /* 手順の番号。連鎖のように順序が要る図でだけ使う */
+  let b = '';
+  for (const k in (opt.badge || {})) {
+    const i = +k, x = pad + (i % C) * cell, y = pad + ((i / C) | 0) * cell;
+    b += `<circle class="m-badge" cx="${x+cell*0.19}" cy="${y+cell*0.19}" r="${cell*0.17}"/>`
+       + `<text class="m-badge-t" x="${x+cell*0.19}" y="${y+cell*0.21}" text-anchor="middle" `
+       + `dominant-baseline="central">${opt.badge[k]}</text>`;
+  }
+
+  return `<svg class="tfig ${opt.cls || ''}" viewBox="0 0 ${W} ${H}">${g}${m}${p}${a}${b}</svg>`;
+}
+
+/* 図の部品。盤だけでは足りないもの(持ち駒・手数・凡例)を組む */
+const figPc = (t, o, cls) =>
+  `<span class="tf-pc ${o === GOTE ? 'gote' : ''} ${cls || ''}">${t === 'K' && o === GOTE ? '玉' : GLYPH[t]}</span>`;
+
+function figTray(label, have, gain) {
+  const pcs = have.map(t => figPc(t, SENTE)).join('')
+            + (gain ? `<span class="tf-plus">＋</span>${figPc(gain, SENTE, 'new')}` : '');
+  return `<div class="tf-tray"><span class="tf-tray-l">${label}</span><span class="tf-pcs">${pcs}</span></div>`;
+}
+
+function figMeter(label, left, total, warn) {
+  let s = '';
+  for (let i = 0; i < total; i++) s += `<i class="${i < left ? 'on' : ''}${warn && i < left ? ' warn' : ''}"></i>`;
+  return `<div class="tf-meter"><span class="tf-meter-l">${label}</span>${s}<b>${left}</b></div>`;
+}
+
+const figCap = (svg, cap) => `<div class="tf-one">${svg}<span class="tf-cap">${cap}</span></div>`;
+const figPair = (a, b) => `<div class="tf-row">${a}<span class="tf-then">▶</span>${b}</div>`;
+const figLegend = items =>
+  `<div class="tf-legend">${items.map(x => `<span><i class="${x.k}"></i>${x.t}</span>`).join('')}</div>`;
+
+/* 銀の動きを、能力のあるなしで引き比べる。エンジンに聞くので実装とずれない */
+function silverReach(abils) {
+  const saved = sideAb; sideAb = { s: abils || {}, g: {} };
+  const p = { b: new Array(NS).fill(null), blocked: new Set(), h: { s:{}, g:{} }, turn: SENTE };
+  p.b[12] = { t:'S', o:SENTE };
+  const ms = targets(p, 12);
+  sideAb = saved;
+  return ms;
 }
 
 /* 駒ごとの動きの図。エンジンに問い合わせるので常に実装と一致する */
@@ -2495,49 +2699,72 @@ const TUTORIAL = [
     title: '駒を奪って、次の階へ',
     text: '相手の駒を取ると、それは<b>自分の持ち駒</b>になります。取った駒は次の階にも持って行けます。',
     fig: () => miniBoard(
-      { 7:{t:'S',o:GOTE}, 12:{t:'G',o:SENTE}, 2:{t:'K',o:GOTE}, 22:{t:'K',o:SENTE} },
-      { 7:'take' }),
-    note: '金で銀を取る → 銀が自分の持ち駒に',
+      { 2:{t:'K',o:GOTE}, 7:{t:'S',o:GOTE}, 12:{t:'G',o:SENTE}, 22:{t:'K',o:SENTE} },
+      { 7:'take' },
+      { arrows:[{ from:12, to:7 }] })
+      + figTray('自分の持ち駒', ['P'], 'S'),
+    note: '金で銀を取る。銀はそのまま自分の持ち駒になる',
   },
   {
     title: '持ち駒は、どこにでも打てる',
-    text: '持ち駒は<b>空いていればどのマスにも置けます</b>。敵陣の奥でも構いません。ここがこのゲームの中心です。',
-    fig: () => miniBoard(
-      { 2:{t:'K',o:GOTE}, 22:{t:'K',o:SENTE} },
-      { 0:'drop', 1:'drop', 3:'drop', 5:'drop', 8:'drop', 11:'drop', 13:'drop', 16:'drop', 19:'drop', 21:'drop' }),
-    note: '緑のマスすべてが打てる場所',
+    text: '持ち駒は<b>空いているマスなら、どこにでも置けます</b>。敵陣のいちばん奥でも構いません。ここがこのゲームの中心です。',
+    fig: () => {
+      const cells = { 2:{t:'K',o:GOTE}, 12:{t:'S',o:GOTE}, 22:{t:'K',o:SENTE} };
+      const marks = {};
+      for (let i = 0; i < NS; i++) if (!cells[i] && i !== 1) marks[i] = 'drop';
+      marks[1] = 'land';
+      cells[1] = { t:'G', o:SENTE };
+      return miniBoard(cells, marks, {}) + figTray('持ち駒', ['S','P'], null);
+    },
+    note: '緑の点すべてが、打てる場所。金は敵の玉の隣に打った',
   },
   {
     title: '守備隊を狩り尽くせば突破',
-    text: '玉以外の敵の駒を<b>すべて取れば</b>その階は突破です。玉を取っても突破できますが、取り分は減ります。',
-    fig: () => miniBoard(
-      { 2:{t:'K',o:GOTE}, 7:{t:'P',o:GOTE}, 12:{t:'G',o:SENTE}, 22:{t:'K',o:SENTE} },
-      { 7:'take' }),
-    note: '残り1枚。これを取れば突破',
+    text: '玉以外の敵の駒を<b>すべて取れば</b>、その階は突破です。玉を取っても抜けられますが、取り分は減ります。',
+    fig: () => figPair(
+      figCap(miniBoard(
+        { 2:{t:'K',o:GOTE}, 7:{t:'P',o:GOTE}, 12:{t:'G',o:SENTE}, 22:{t:'K',o:SENTE} },
+        { 7:'take' }, { cls:'pair', arrows:[{ from:12, to:7 }] }), '守備隊 残り 1'),
+      figCap(miniBoard(
+        { 2:{t:'K',o:GOTE}, 7:{t:'G',o:SENTE}, 22:{t:'K',o:SENTE} },
+        {}, { cls:'pair' }), '守備隊 0 → 突破')),
+    note: '玉は守備隊に数えません',
   },
   {
     title: '手数が尽きると、崩れる',
-    text: '階ごとに<b>手数</b>が決まっています。使い切ると<b>崩壊</b>が始まり、一手ごとに敵の増援が降ってきます。',
-    fig: () => miniBoard(
-      { 2:{t:'K',o:GOTE}, 6:{t:'S',o:GOTE}, 8:{t:'N',o:GOTE}, 13:{t:'P',o:GOTE}, 22:{t:'K',o:SENTE} },
-      {}),
-    note: '早く抜けるほど得点も伸びます',
+    text: '階ごとに<b>手数</b>が決まっています。使い切ると<b>崩壊</b>がはじまり、一手ごとに床が抜け、敵の増援が降ってきます。',
+    fig: () => figPair(
+      figCap(miniBoard(
+        { 2:{t:'K',o:GOTE}, 8:{t:'S',o:GOTE}, 13:{t:'P',o:GOTE}, 22:{t:'K',o:SENTE} },
+        {}, { cls:'pair' }), figMeter('のこり手数', 1, 6, true)),
+      figCap(miniBoard(
+        { 2:{t:'K',o:GOTE}, 8:{t:'S',o:GOTE}, 13:{t:'P',o:GOTE}, 6:{t:'N',o:GOTE}, 22:{t:'K',o:SENTE} },
+        { 5:'ruin', 9:'ruin', 15:'ruin', 6:'land' }, { cls:'pair' }), '崩壊。床が抜け、増援')),
+    note: '早く抜けるほど、得点は伸びます',
   },
   {
     title: '続けて取ると、跳ねる',
-    text: '駒を続けて取ると<b>連鎖</b>が伸び、得点が跳ね上がります。5連鎖でFEVER。取らない手が続くと切れます。',
+    text: '駒を続けて取ると<b>連鎖</b>が伸び、得点が跳ね上がります。5連鎖で<b>FEVER</b>。取らない手が続くと切れます。',
     fig: () => miniBoard(
-      { 2:{t:'K',o:GOTE}, 6:{t:'P',o:GOTE}, 8:{t:'P',o:GOTE}, 12:{t:'R',o:SENTE,pr:true}, 22:{t:'K',o:SENTE} },
-      { 6:'take', 8:'take' }),
-    note: '連続で取れる形を作るのがコツ',
+      { 2:{t:'K',o:GOTE}, 11:{t:'P',o:GOTE}, 13:{t:'P',o:GOTE},
+        12:{t:'R',o:SENTE,pr:true}, 22:{t:'K',o:SENTE} },
+      { 11:'take', 13:'take' },
+      { arrows:[{ from:12, to:11 }, { from:12, to:13 }], badge:{ 11:'1', 13:'2' } })
+      + figMeter('連鎖', 2, 5),
+    note: '1手目で取り、次の手でも取る。切らさずに繋ぐ',
   },
   {
     title: '一階ごとに、能力をひとつ',
-    text: '階を抜けるたびに能力を<b>3つから1つ</b>選びます。駒の動きが変わるもの、手数が増えるものなど68種類。',
-    fig: () => miniBoard(
-      { 12:{t:'S',o:SENTE} },
-      { 6:'move', 7:'move', 8:'move', 16:'move', 18:'move', 11:'drop', 13:'drop' }),
-    note: '「銀嶺」を取ると銀が横にも動けるようになる(緑が増えた分)',
+    text: '階を抜けるたび、<b>3つから1つ</b>能力を選びます。駒の動きが変わるもの、手数が増えるものなど68種類。',
+    fig: () => {
+      const base = silverReach(null), wide = silverReach({ silverWide:1 });
+      const mk = ms => { const o = {}; for (const i of base) o[i] = 'base'; for (const i of ms) if (!base.includes(i)) o[i] = 'move'; return o; };
+      return figPair(
+        figCap(miniBoard({ 12:{t:'S',o:SENTE} }, mk(base), { cls:'pair' }), 'ふつうの銀'),
+        figCap(miniBoard({ 12:{t:'S',o:SENTE} }, mk(wide), { cls:'pair' }), '銀嶺を取ったあと'))
+        + figLegend([{ k:'base', t:'もとの動き' }, { k:'move', t:'増えた動き' }]);
+    },
+    note: '横に2マス増える。図はゲーム本体と同じ計算で描いています',
   },
 ];
 

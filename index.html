@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788617297">
+<link rel="stylesheet" href="style.css?v=1788622994">
 </head>
 <body>
 <div id="crt"></div>
@@ -32,6 +32,7 @@
   </div>
 </div>
 <div id="flash"></div>
+<div id="matchup" class="hidden"></div>
 <div id="transition" class="hidden"><b id="tr-num"></b><i id="tr-label"></i></div>
 
 <!-- ============ タイトル ============ -->
@@ -84,63 +85,82 @@
 
 <!-- ============ 対戦セットアップ ============ -->
 <div id="setup" class="screen hidden">
-  <p class="tag">VERSUS</p>
+  <p class="tag">versus</p>
   <h2 class="screen-title">対戦</h2>
-  <div class="army" id="army-sente">
-    <div class="army-head"><span class="army-side">▲ 先手</span><select id="sel-sente"></select></div>
+
+  <!-- 手順1: 相手を選ぶ -->
+  <p class="step-head"><b>1</b>だれと</p>
+  <nav class="menu mode-menu" id="mode-menu">
+    <button class="mi mode on" data-mode="cpu">
+      <span class="mi-no">▣</span>
+      <span class="mi-body"><b>CPU</b><span class="mi-sub">ひとりで。相手の編成はおまかせ</span></span>
+      <span class="mi-rule"></span><i>solo</i></button>
+    <button class="mi mode" data-mode="hotseat">
+      <span class="mi-no">▤</span>
+      <span class="mi-body"><b>ふたりで交代</b><span class="mi-sub">この端末をまわして指す</span></span>
+      <span class="mi-rule"></span><i>hotseat</i></button>
+    <button class="mi mode" data-mode="p2p">
+      <span class="mi-no">▥</span>
+      <span class="mi-body"><b>べつの端末</b><span class="mi-sub">合言葉でつなぐ。離れていても遊べる</span></span>
+      <span class="mi-rule"></span><i>online</i></button>
+    <button class="mi mode" data-mode="net">
+      <span class="mi-no">▦</span>
+      <span class="mi-body"><b>べつの端末 / 同じWi-Fi</b><span class="mi-sub">serve.py が要る。回線を使わない</span></span>
+      <span class="mi-rule"></span><i>lan</i></button>
+  </nav>
+
+  <div id="net-box" class="net-box hidden">
+    <div class="setup-row">
+      <label for="net-room">合言葉</label>
+      <input id="net-room" type="text" maxlength="12" placeholder="例: kz-0906" autocomplete="off">
+    </div>
+    <div class="setup-row">
+      <label for="net-seat">自分は</label>
+      <select id="net-seat">
+        <option value="s">▲ 先手(部屋をひらく)</option>
+        <option value="g">△ 後手(合言葉ではいる)</option>
+      </select>
+    </div>
+    <p class="net-status" id="net-status"></p>
+    <p class="net-url" id="net-url"></p>
+    <p class="net-hint" id="net-hint"></p>
+  </div>
+
+  <!-- 手順2: 編成のもとを選ぶ -->
+  <p class="step-head"><b>2</b>どの編成で</p>
+  <div class="army">
+    <div class="army-head"><span class="army-side" id="side-label">自分</span><select id="sel-sente"></select></div>
     <div class="army-pieces" id="pieces-sente"></div>
     <div class="army-abils" id="abils-sente"></div>
     <p class="army-note" id="note-sente"></p>
   </div>
 
-  <div class="vs-mark">対</div>
-
-  <div class="army" id="army-gote">
-    <div class="army-head"><span class="army-side">△ 後手</span><select id="sel-gote"></select></div>
-    <div class="army-pieces" id="pieces-gote"></div>
-    <div class="army-abils" id="abils-gote"></div>
-    <p class="army-note" id="note-gote"></p>
-  </div>
-
-  <div class="setup-row"><label>後手を</label>
-    <select id="sel-gote-ctrl">
-      <option value="human">人が指す(交代操作)</option>
-      <option value="cpu">CPUが指す</option>
-      <option value="net">別の端末 / 同じWi-Fi</option>
-      <option value="p2p">別の端末 / インターネット</option>
-    </select>
-  </div>
-
-  <div id="net-box" class="net-box hidden">
-    <div class="setup-row">
-      <label for="net-room">合言葉</label>
-      <input id="net-room" type="text" maxlength="8" placeholder="例: SHOGI" autocomplete="off">
+  <div id="gote-pick" class="hidden">
+    <div class="army">
+      <div class="army-head"><span class="army-side">△ 後手</span><select id="sel-gote"></select></div>
+      <div class="army-pieces" id="pieces-gote"></div>
+      <div class="army-abils" id="abils-gote"></div>
+      <p class="army-note" id="note-gote"></p>
     </div>
-    <div class="setup-row">
-      <label for="net-seat">自分は</label>
-      <select id="net-seat">
-        <option value="s">▲ 先手</option>
-        <option value="g">△ 後手</option>
-      </select>
-    </div>
-    <p class="net-status" id="net-status">同じWi-Fiの2台で、同じ合言葉を入れてください。</p>
-    <p class="net-url" id="net-url"></p>
-    <p class="net-hint" id="net-hint"></p>
   </div>
-  <p class="hint">先に2勝した方の勝ち。局ごとに先番を入れ替えます。<br>
-    開始すると、それぞれ駒10枚と能力を選ぶ編成画面に進みます。</p>
+  <p class="hint" id="setup-hint"></p>
+
   <div class="menu">
-    <button id="btn-setup-start" class="mi primary"><span class="mi-no">▶</span><span class="mi-body"><b>開　始</b><span class="mi-sub">編成画面に進む</span></span><span class="mi-rule"></span><i>start</i></button>
-    <button id="btn-setup-back" class="mi"><span class="mi-no">◀</span><span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+    <button id="btn-setup-start" class="mi primary"><span class="mi-no">▶</span>
+      <span class="mi-body"><b>すすむ</b><span class="mi-sub">駒 → 能力 の順に組みます</span></span>
+      <span class="mi-rule"></span><i>next</i></button>
+    <button id="btn-setup-back" class="mi"><span class="mi-no">◀</span>
+      <span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
   </div>
 </div>
 
 <!-- ============ デッキ構築 ============ -->
 <div id="deck" class="screen hidden">
   <p class="tag" id="deck-tag">DECK</p>
+  <p class="deck-step" id="deck-step"></p>
   <h2 class="screen-title" id="deck-title">編成</h2>
 
-  <div class="deck-sec">
+  <div class="deck-sec" id="deck-sec-pieces">
     <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
     <p class="hint" id="deck-piece-hint"></p>
     <div id="deck-quick" class="deck-quick hidden">
@@ -151,7 +171,7 @@
     <div id="deck-pieces" class="deck-pieces"></div>
   </div>
 
-  <div class="deck-sec">
+  <div class="deck-sec hidden" id="deck-sec-abils">
     <p class="deck-head"><span>能力</span><b id="deck-cost">コスト 0 / 10　枠 0 / 5</b></p>
     <div id="deck-meter" class="deck-meter"></div>
     <p class="hint">並2 / 希4 / 極10。潜って修得した能力は1安い。選んだものは上に並びます。</p>
@@ -303,6 +323,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788617297"></script>
+<script src="game.js?v=1788622994"></script>
 </body>
 </html>
