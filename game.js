@@ -763,6 +763,11 @@ const sfx = {
   pick:  r => play('power', r === 3 ? 0.8 : r === 2 ? 1.0 : 1.2, 0.9),
   dead:  () => play('clear', 0.62, 1),
   revive:() => play('heavy', 1.35, 0.9),
+  // 極が出た瞬間は、重い一撃と高い煌めきを重ねる(並と同じ音では当たりが立たない)
+  jackpot:() => { play('heavy', 0.72, 1); setTimeout(() => play('power', 1.5, 0.8), 60);
+                  setTimeout(() => play('power', 2.0, 0.5), 150); },
+  chainBreak:() => play('hit', 0.55, 0.5),        // 連鎖が切れた
+  collapse:() => play('heavy', 0.6, 0.55),        // 崩壊の足音
 };
 
 function shake(power = 1) {
@@ -1471,7 +1476,9 @@ function applyMove(mv, fromNet) {
   // 手番を明け渡すときだけ手数を消費する(追撃はタダ、強襲打ちなら打つ手もタダ)
   if (mode === 'solo' && mover === SENTE && !extra) {
     if (!captured && floorState.combo > 0 && --floorState.grace <= 0) {
+      const lost = floorState.combo;
       floorState.combo = 0; showCombo(0); setFever(false);
+      if (lost >= 3) { sfx.chainBreak(); popText(mv.to, '連鎖 切れ', 'warn'); }
     }
     const rush = ab(SENTE,'chainRush') && floorState.combo >= 3;
     const freeDrop = (mv.drop && ab(SENTE,'dropStrike')) || rush;
@@ -1480,7 +1487,9 @@ function applyMove(mv, fromNet) {
     if (!freeDrop && floorState.movesLeft < 0) {
       floorState.collapse++;
       const idx = spawnReinforcement();
-      shake(2.2); sfx.alarm(); flashScreen();
+      shake(2.2); flashScreen();
+      // 崩壊の1手目は警報、以降は足音。毎手同じ警報だと耳が慣れて緊張が抜ける
+      if (floorState.collapse === 1) sfx.alarm(); else sfx.collapse();
       msg += idx === null ? '  ／崩壊' : '  ／崩壊 増援';
     } else if (!freeDrop && floorState.movesLeft === 0) {
       popText(22, '手数切れ', 'warn'); shake(1.4);
@@ -1909,7 +1918,7 @@ function takeAbility(a) {
   if (a.pick) a.pick(run);
   if (a.id === 'revive')  run.reviveLeft += 1;
   if (a.id === 'revive2') run.reviveLeft += 1;
-  sfx.pick(a.r);
+  if (a.r === 3) sfx.jackpot(); else sfx.pick(a.r);
   $('draft').classList.add('hidden');
   const next = afterDraft;
   afterDraft = null;
