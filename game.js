@@ -1153,15 +1153,7 @@ function setFever(on) {
   if (document.body.classList.contains('fever') === on) return;
   document.body.classList.toggle('fever', on);
   duckBgm(on);
-  // FEVERのあいだはBGMを半音上げる。ループ点は秒で持っているので継ぎ目は崩れない
-  if (bgmSrc) {
-    const x = ac();
-    try {
-      bgmSrc.playbackRate.cancelScheduledValues(x.currentTime);
-      bgmSrc.playbackRate.setValueAtTime(bgmSrc.playbackRate.value, x.currentTime);
-      bgmSrc.playbackRate.linearRampToValueAtTime(on ? 1.0595 : 1, x.currentTime + 0.45);
-    } catch (e) {}
-  }
+  // BGMの速さや高さは動かさない(曲は曲のまま鳴らす)
   if (on) { flashScreen('hard'); sfx.power(3); ringBurst(3); stamp('FEVER', 'fever'); }
 }
 
