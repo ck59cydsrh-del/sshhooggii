@@ -641,6 +641,12 @@ function startFloor() {
     ? '玉は盤に、他はすべて持ち駒。空いていればどこにでも打てる。'
     : `${run.floor}階。稼いだ駒を打ち込め。`);
   render();
+  // 降り立った手ごたえ。盤が下から入る
+  if (!motionCalm) {
+    const g = $('game');
+    g.classList.remove('dropped'); void g.offsetWidth; g.classList.add('dropped');
+    setTimeout(() => g.classList.remove('dropped'), 460);
+  }
   income.forEach(([id, detail], i) => setTimeout(() => announce(id, detail), 160 * i));
 
   // 自己最高を超えた階に入った瞬間。ここから先は全部が初めての景色
@@ -1147,6 +1153,15 @@ function setFever(on) {
   if (document.body.classList.contains('fever') === on) return;
   document.body.classList.toggle('fever', on);
   duckBgm(on);
+  // FEVERのあいだはBGMを半音上げる。ループ点は秒で持っているので継ぎ目は崩れない
+  if (bgmSrc) {
+    const x = ac();
+    try {
+      bgmSrc.playbackRate.cancelScheduledValues(x.currentTime);
+      bgmSrc.playbackRate.setValueAtTime(bgmSrc.playbackRate.value, x.currentTime);
+      bgmSrc.playbackRate.linearRampToValueAtTime(on ? 1.0595 : 1, x.currentTime + 0.45);
+    } catch (e) {}
+  }
   if (on) { flashScreen('hard'); sfx.power(3); ringBurst(3); stamp('FEVER', 'fever'); }
 }
 
@@ -1349,12 +1364,21 @@ function render() {
     $('turn-label').className = pos.turn === SENTE && left <= 3 ? 'close' : '';
     $('score').textContent = run.score.toLocaleString('ja-JP');
     $('score').style.visibility = '';
+    // 自己最高が見えてきたら、あと何点かを出す。越えたら黙る
+    const chase = $('score-chase');
+    if (chase) {
+      const best = Number(localStorage.getItem(SCORE_KEY) || 0);
+      const left = best - run.score;
+      chase.textContent = (best > 0 && left > 0 && run.score > best * 0.6)
+        ? `自己最高まで ${left.toLocaleString('ja-JP')}` : '';
+    }
   } else {
     $('floor-label').textContent = `ROUND ${match.game}`;
     $('turn-label').textContent = pos.turn === SENTE
       ? `▲ ${match.s.name}`
       : `△ ${match.g.name}`;
     $('score').style.visibility = 'hidden';
+    const chase = $('score-chase'); if (chase) chase.textContent = '';
   }
 }
 
@@ -1498,14 +1522,15 @@ function renderCharges() {
   const maxExtra = ab(SENTE,'extraTurn') ? 1 + ab(SENTE,'extraTurn2') : 0;
   if (maxExtra) rows.push(['CHAIN-HIT', floorState.extraLeft.s, maxExtra, false]);
   if (ab(SENTE,'firstStrike')) rows.push(['FIRST', floorState.firstStrike.s ? 0 : 1, 1, false]);
-  if (floorState.combo > 0) rows.push(['CHAIN-GRACE', floorState.grace, 3 + ab(SENTE,'comboKeep'), false]);
+  if (floorState.combo > 0)
+    rows.push(['CHAIN-GRACE', floorState.grace, 3 + ab(SENTE,'comboKeep'), false, floorState.grace <= 1]);
   if (mode === 'solo' && (ab(SENTE,'revive') || run.reviveLeft))
     rows.push(['REVIVE', run.reviveLeft, ab(SENTE,'revive') + ab(SENTE,'revive2'), true]);
   if (!rows.length) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
-  for (const [label, left, max, hot] of rows) {
+  for (const [label, left, max, hot, urgent] of rows) {
     const d = document.createElement('div');
-    d.className = 'charge' + (hot ? ' hot' : '');
+    d.className = 'charge' + (hot ? ' hot' : '') + (urgent ? ' urgent' : '');
     const dots = Array.from({ length: Math.max(max, left) },
       (_, k) => `<b class="${k < left ? '' : 'off'}"></b>`).join('');
     d.innerHTML = `${label}<i>${dots}</i>`;

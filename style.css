@@ -1282,3 +1282,17 @@ body.calm .pc.flyer{display:none}
   padding:5px 2px;border-radius:0}
 .pb-rename input:focus{outline:none;border-bottom-color:var(--green)}
 .pb-rename .mini{flex:none}
+
+/* 連鎖が切れる寸前。あと一手で消える、が目に入る */
+.charge.urgent{color:var(--ink)}
+.charge.urgent i b{background:var(--green)}
+@keyframes chargeUrge{0%,100%{opacity:1}50%{opacity:.35}}
+.charge.urgent i b:not(.off){animation:chargeUrge .55s steps(2,end) infinite}
+body.calm .charge.urgent i b:not(.off){animation:none}
+
+/* 階に降り立つ瞬間、盤が下から入る */
+@keyframes floorDrop{from{opacity:.35;transform:translateY(-16px)}to{opacity:1;transform:none}}
+#game.dropped .board-frame{animation:floorDrop .4s var(--jelly-soft)}
+body.calm #game.dropped .board-frame{animation:none}
+.score-chase{font-size:8.5px;letter-spacing:.1em;color:var(--green);line-height:1;
+  min-height:9px;display:block;text-align:right}
