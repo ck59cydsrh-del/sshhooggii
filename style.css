@@ -163,10 +163,14 @@ body{
 .mi i{font-style:normal;font-size:9.5px;letter-spacing:.24em;color:var(--g45);flex:none;
   text-transform:lowercase;padding-top:3px}
 /* 先頭だけ主役として濃くする */
-.mi.primary{border-top-color:var(--ink)}
+.mi.primary{border-top-color:var(--ink);position:relative}
 .mi.primary b{font-size:24px}
 .mi.primary .mi-no{color:var(--green)}
 .mi.primary i{color:var(--green)}
+/* 本筋の行だけ、左に緑の細い柱を立てる */
+.mi.primary::before{content:'';position:absolute;left:-8px;top:12px;bottom:12px;width:2px;
+  background:var(--green);transition:top .16s var(--jelly-soft),bottom .16s var(--jelly-soft)}
+@media (hover:hover){ .mi.primary:hover::before{top:6px;bottom:6px} }
 
 .icon-btn{
   font-family:var(--sans);font-size:10.5px;letter-spacing:.14em;
@@ -324,7 +328,7 @@ body{
   letter-spacing:.06em;
 }
 .army-note{font-size:10.5px;line-height:1.9;color:var(--g70);letter-spacing:.04em;
-  margin:-6px 0 18px 70px;min-height:1.9em}
+  margin:2px 0 18px;min-height:1.9em}
 
 .preset-list{display:flex;flex-direction:column;gap:0;margin-bottom:26px;
   border-bottom:1px solid var(--g12)}
@@ -763,7 +767,7 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 
 /* ---------- 対戦の編成カード ---------- */
 .army{border-top:1px solid var(--ink);padding:12px 0 14px}
-.army-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.army-head{display:flex;align-items:center;gap:12px 10px;margin-bottom:10px;flex-wrap:wrap}
 .army-side{font-family:var(--mincho);font-size:15px;letter-spacing:.22em;flex:none;min-width:74px}
 .army-head select{flex:1;font-family:var(--sans);font-size:11px;padding:7px 0;border-radius:0;
   background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);letter-spacing:.04em}
@@ -901,3 +905,13 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 @media (prefers-reduced-motion:reduce){
   .wordmark::before,.clock.collapse .clock-ticks b{animation:none}
 }
+
+/* 編成の出どころを一目で分ける。潜って持ち帰ったほうが主役 */
+.army-tag{font-family:var(--sans);font-size:9px;letter-spacing:.14em;
+  color:var(--g45);border:1px solid var(--g12);padding:3px 7px;white-space:nowrap}
+.army-tag.dive{background:var(--glow);border-color:var(--ink);color:var(--ink)}
+.army.is-dive{border-left:2px solid var(--green);padding-left:11px}
+.army-note .note-ab{display:block;margin-top:4px;color:var(--g45)}
+.army-note b{color:var(--ink);font-weight:400}
+/* 段の番号は、そこが本題であることの印 */
+.step-head b{background:var(--glow);border-color:var(--ink)}

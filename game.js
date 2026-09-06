@@ -1860,6 +1860,22 @@ function showBest() {
   const f = Number(localStorage.getItem(BEST_KEY) || 0);
   const s = Number(localStorage.getItem(SCORE_KEY) || 0);
   $('best-record').textContent = f ? `最高到達 ${f}階   最高スコア ${s.toLocaleString('ja-JP')}` : '';
+  showRoute();
+}
+
+/* このゲームの本筋は「潜って持ち帰った編成で対戦する」こと。
+   持ち帰りがあるかどうかで、タイトルの主役を潜るか対戦かに振り替える。 */
+function showRoute() {
+  const saved = loadPresets().filter(Boolean);
+  const vs = $('btn-versus');
+  vs.querySelector('.mi-sub').textContent =
+      saved.length === 0 ? '既定編成で遊べます。潜れば自分の編成で戦えます'
+    : saved.length === 1 ? `${saved[0].name}で戦う`
+    :                      `${saved[0].name}ほか${saved.length - 1}件で戦う`;
+  // 持ち帰りがあれば対戦も主役に上げる(潜る→対戦がこのゲームの本筋)
+  vs.classList.toggle('primary', saved.length > 0);
+  $('btn-presets').querySelector('.mi-sub').textContent =
+    saved.length ? `持ち帰った編成 ${saved.length} / ${SLOTS}` : 'まだ何も持ち帰っていない';
 }
 
 /* ---------- プリセット ---------- */
@@ -1896,6 +1912,16 @@ function openPresets(m, savedIdx = -1) {
   :                 '対戦で選べます。';
   $('btn-presets-back').querySelector('b').textContent =
     m === 'save' ? '保存せずに終える' : '戻る';
+
+  // 保存した直後は、そのまま対戦へ入れるようにする(ここが本筋の合流点)
+  const saved = loadPresets();
+  const go = savedIdx >= 0 ? savedIdx : saved.findIndex(Boolean);
+  const btn = $('btn-presets-versus');
+  btn.classList.toggle('hidden', m === 'save' || go < 0 || !saved[go]);
+  if (saved[go]) {
+    $('pv-sub').textContent = `${saved[go].name} — 能力が安く積めます`;
+    btn.onclick = () => { sfx.ui(); openSetup('s' + go); };
+  }
 
   const list = $('preset-list');
   const data = loadPresets();
@@ -1958,8 +1984,22 @@ let lastVersus = { s:STANDARD, g:STANDARD };
 let match = null;
 function fillSelect(sel) {
   sel.innerHTML = '';
+  const saved = loadPresets();
+  // このゲームの主役は「潜って持ち帰った編成で戦う」ことなので先頭に置く
+  if (saved.some(Boolean)) {
+    const g = document.createElement('optgroup');
+    g.label = '★ 持ち帰った編成 — 能力が安く積める';
+    saved.forEach((p, i) => {
+      if (!p) return;
+      const o = document.createElement('option');
+      o.value = 's' + i;
+      o.textContent = `${p.name} — ${poolTotal(p.pool)}枚から10枚 / ${p.floor || '?'}階`;
+      g.appendChild(o);
+    });
+    sel.appendChild(g);
+  }
   const made = document.createElement('optgroup');
-  made.label = '既定編成';
+  made.label = saved.some(Boolean) ? '既定編成 — 駒は固定' : '既定編成';
   BUILTIN.forEach((b, i) => {
     const o = document.createElement('option');
     o.value = 'b' + i;
@@ -1967,19 +2007,12 @@ function fillSelect(sel) {
     made.appendChild(o);
   });
   sel.appendChild(made);
+}
+/* 最初に選ばせたい編成。持ち帰ったものがあればそれを既定にする */
+function defaultSide(skip) {
   const saved = loadPresets();
-  if (saved.some(Boolean)) {
-    const g = document.createElement('optgroup');
-    g.label = '潜って保存した編成';
-    saved.forEach((p, i) => {
-      if (!p) return;
-      const o = document.createElement('option');
-      o.value = 's' + i;
-      o.textContent = `枠${i+1} ${p.name} — ${poolText(p.pool)}`;
-      g.appendChild(o);
-    });
-    sel.appendChild(g);
-  }
+  for (let i = 0; i < saved.length; i++) if (saved[i] && 's'+i !== skip) return 's' + i;
+  return skip === 'b0' ? 'b1' : 'b0';
 }
 function pickSide(sel) {
   const v = sel.value || 'b0';
@@ -2210,6 +2243,18 @@ function renderArmy(selId, piecesId, abilsId, noteId) {
   const pbox = $(piecesId), abox = $(abilsId);
   pbox.innerHTML = ''; abox.innerHTML = '';
 
+  // 潜って持ち帰った編成が主役。何が違うのかをその場で言う
+  const army = $(selId).closest('.army');
+  army.classList.toggle('is-dive', !!src.editable);
+  const head = army.querySelector('.army-head');
+  let tag = head.querySelector('.army-tag');
+  if (!tag) {                                   // 名前のすぐ隣に置く。選択肢の下に回すと目に入らない
+    tag = document.createElement('span'); tag.className = 'army-tag';
+    head.insertBefore(tag, head.querySelector('select'));
+  }
+  tag.className = 'army-tag' + (src.editable ? ' dive' : '');
+  tag.textContent = src.editable ? '持ち帰った編成' : '既定編成';
+
   const shown = src.editable ? autoPieces(src.pool) : src.pool;
   let value = 0;
   for (const t of HAND_ORDER) {
@@ -2248,14 +2293,18 @@ function showNote(selId, noteId) {
   const abNames = Object.keys(src.abilities || {})
     .filter(id => VS_OK.has(id))
     .map(id => ABI_BY_ID[id].n);
-  $(noteId).textContent = (src.note ? src.note : '') + (abNames.length ? `  [${abNames.join(' / ')}]` : '');
+  $(noteId).innerHTML = src.editable
+    ? '駒を10枚に絞り、<b>修得ずみの能力だけ</b>を選びます。'
+      + '既定編成より安く積めます(並1 / 希2 / 極5)。'
+    : '駒は固定。能力は全種から選べますが値は張ります(並2 / 希4 / 極10)。'
+      + (abNames.length ? `<span class="note-ab">初期の能力 ${abNames.join(' / ')}</span>` : '');
 }
-function openSetup() {
+function openSetup(prefer) {
   ['title','game','presets','deck'].forEach(id => $(id).classList.add('hidden'));
   $('setup').classList.remove('hidden');
   fillSelect($('sel-sente')); fillSelect($('sel-gote'));
-  $('sel-sente').value = 'b0';
-  $('sel-gote').value  = 'b1';
+  $('sel-sente').value = prefer || defaultSide();
+  $('sel-gote').value  = defaultSide($('sel-sente').value);
   applyVsMode();
   renderArmy('sel-sente', 'pieces-sente', 'abils-sente', 'note-sente');
   renderArmy('sel-gote', 'pieces-gote', 'abils-gote', 'note-gote');
