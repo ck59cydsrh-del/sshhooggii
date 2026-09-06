@@ -1133,3 +1133,10 @@ body.calm .pc.flyer{display:none}
   100%{transform:scale(.7) rotate(-6deg);opacity:.5}
 }
 .vl i.breaking{animation:lifeBreak .5s var(--jelly) forwards}
+
+/* 玉が取られる位置にいる。相手の利きは見せずに、結果だけを示す */
+@keyframes dangerPulse{0%,100%{box-shadow:inset 0 0 0 3px var(--ink)}50%{box-shadow:inset 0 0 0 3px transparent}}
+.cell.in-danger{animation:dangerPulse .62s steps(2,end) infinite}
+body.calm .cell.in-danger{animation:none;box-shadow:inset 0 0 0 3px var(--ink)}
+.cell.in-reach{box-shadow:inset 0 0 0 2px var(--green)}
+.stamp.danger{font-family:var(--mincho);font-size:30px;letter-spacing:.18em;color:var(--ink)}

@@ -443,7 +443,10 @@ function evaluate(pos, o) {
     const p = pos.b[i];
     if (!p) continue;
     let v = pieceVal(p);
-    if (p.t !== 'K') v += (p.o === SENTE ? (R-1-rowOf(i)) : rowOf(i)) * 8;
+    const adv = p.o === SENTE ? (R-1-rowOf(i)) : rowOf(i);   // 自陣からの前進度
+    // 玉だけは前に出るほど危ない。これが無いと敵の玉が自陣を捨てて
+    // こちらの玉へ突っ込んでくる(5回試して5回ともそれで負けた)
+    v += p.t === 'K' ? -adv * 55 : adv * 8;
     s += p.o === o ? v : -v;
   }
   for (const side of [SENTE, GOTE])
@@ -585,7 +588,7 @@ let gen = 0;
 /* ---------- ラン ---------- */
 function startRun() {
   mode = 'solo';
-  run = { floor:1, pool:{ G:1, P:1 }, abilities:{}, score:0, reviveLeft:0, comboBest:0 };
+  run = { floor:1, pool:{ G:1, P:1 }, abilities:{}, score:0, reviveLeft:0, comboBest:0, taken:0 };
   scoreShown = 0; $('score').textContent = '0';
   sideAb = { s:run.abilities, g:{} };
   startFloor();
@@ -849,6 +852,21 @@ if (typeof ResizeObserver !== 'undefined') {
   if (document.readyState !== 'loading') watch();
 }
 addEventListener('resize', queueFit);
+
+/* 玉が取られる位置にいるか。相手の利きは見せない方針なので、
+   「危ない」という結果だけを伝える。将棋の王手にあたる。 */
+function inCheck(p, o) {
+  const foe = other(o);
+  let king = -1;
+  for (let i = 0; i < NS; i++) { const q = p.b[i]; if (q && q.o === o && q.t === 'K') { king = i; break; } }
+  if (king < 0) return false;
+  for (let i = 0; i < NS; i++) {
+    const q = p.b[i];
+    if (!q || q.o !== foe) continue;
+    if (targets(p, i).includes(king)) return true;
+  }
+  return false;
+}
 
 function repaint() {
   render();
@@ -1220,6 +1238,9 @@ function render() {
   board.innerHTML = '';
   const active = humanControls(pos.turn) && !busy;
   document.body.classList.toggle('flipped', flipped());
+  // 玉が取られる位置にいるか(自分と相手それぞれ)
+  const checkedSides = {};
+  for (const o of [SENTE, GOTE]) checkedSides[o] = inCheck(pos, o);
 
   for (let d = 0; d < NS; d++) {
     const i = viewToBoard(d);
@@ -1237,6 +1258,7 @@ function render() {
     if (p) {
       cell.appendChild(pieceEl(p));
       if (active && p.o === pos.turn) cell.classList.add('clickable');
+      if (p.t === 'K' && checkedSides[p.o]) cell.classList.add(p.o === myView() ? 'in-danger' : 'in-reach');
     }
     cell.addEventListener('click', () => onCell(i));
     board.appendChild(cell);
@@ -1512,6 +1534,7 @@ function applyMove(mv, fromNet) {
       floorState.combo++;
       floorState.grace = 3 + ab(SENTE,'comboKeep');
       floorState.captured[captured.t] = (floorState.captured[captured.t] || 0) + 1;
+      if (run) run.taken = (run.taken || 0) + 1;
       const big = ab(SENTE,'bigGame') && (captured.t === 'R' || captured.t === 'B' || captured.t === 'G') ? 3 : 1;
       const per = ab(SENTE,'chainMult') ? 0.5 : 0.25;
       const gained = addScore(pieceVal(captured) * (1 + floorState.combo*per) * scoreMult() * big);
@@ -1605,8 +1628,19 @@ function applyMove(mv, fromNet) {
       popText(22, '手数切れ', 'warn'); shake(1.4);
     }
   }
-  setLog(msg);
   repaint();
+  // 玉が取られる位置に入ったことは、必ず言う(相手の利きは見せない方針なので
+  // 結果だけを伝える)。1階で気づかず取られる事故がいちばん多かった。
+  const meNow = myView();
+  if (pos.b.some(q => q && q.t === 'K' && q.o === meNow) && inCheck(pos, meNow)) {
+    msg += '　◆ 玉があぶない';
+    if (!floorState.warned) { floorState.warned = true; stamp('玉があぶない', 'danger'); }
+    sfx.alarm(); shake(1.4);
+  } else if (floorState) {
+    floorState.warned = false;
+    if (inCheck(pos, other(meNow))) msg += '　◆ 王手';
+  }
+  setLog(msg);
   if (!motionCalm) {
     const cell = $('board').children[boardToView(landed)];
     const pcEl = cell && cell.querySelector('.pc');
@@ -1879,6 +1913,20 @@ function spendRevive(o) {
 
 /* 玉を取られた側が生き延びられるか。身代わり(歩1枚)→影武者(持ち駒半減)の順に試す */
 function cheatDeath(o) {
+  // 1階だけは一度だけ持ちこたえる。序盤の事故で何も持ち帰れずに終わる
+  // 体験がいちばん多く、そこでやめる理由になっていた。
+  if (mode === 'solo' && o === SENTE && run && run.floor === 1 && floorState && !floorState.mercyUsed) {
+    floorState.mercyUsed = true;
+    sfx.revive(); shake(2.2); flashScreen('hard');
+    const spot = restoreKing(o);
+    floorState.combo = 0; showCombo(0);
+    popText(spot, '立て直し', 'revive');
+    stamp('立て直し', 'best');
+    setLog('◆ 1階では一度だけ立て直せる。次は玉を守れ。');
+    render();
+    maybeCpuMove();
+    return true;
+  }
   if (ab(o,'sacrifice') && pos.h[o].P > 0) {
     pos.h[o].P--;
     sfx.revive(); shake(1.8);
@@ -1915,8 +1963,11 @@ function runOver() {
   const bestScore = Math.max(run.score, Number(localStorage.getItem(SCORE_KEY) || 0));
   const isNewScore = run.score >= bestScore && run.score > 0;
   try { localStorage.setItem(BEST_KEY, String(best)); localStorage.setItem(SCORE_KEY, String(bestScore)); } catch (e) {}
+  const abN = Object.values(run.abilities).reduce((a, b) => a + b, 0);
   showOverlay('討ち死に',
-    `到達 ${reached}階   最高連鎖 ×${run.comboBest}\nスコア ${run.score.toLocaleString('ja-JP')}`
+    `到達 ${reached}階   最高連鎖 ×${run.comboBest}\n`
+    + `奪った駒 ${run.taken || 0}枚   修得した能力 ${abN}個\n`
+    + `スコア ${run.score.toLocaleString('ja-JP')}`
     + (isNewScore ? '   自己新!' : `\n最高 ${bestScore.toLocaleString('ja-JP')}`)
     + '\n持ち駒はすべて失われた。', [
     ['もう一度潜る', startRun],
@@ -2069,6 +2120,7 @@ function takeAbility(a) {
   const next = afterDraft;
   afterDraft = null;
   if (next) next();
+  setTimeout(() => announce(a.id, '修得した'), 60);   // 何を手に入れたのかを盤に刻む
 }
 function openAbilityList(side) {
   const box = $('ability-list');
@@ -2103,6 +2155,10 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '
   $('overlay').classList.remove('win', 'lose');
   if (mood) $('overlay').classList.add(mood);
   $('overlay-tag').textContent = tag;
+  if (rank === 'S' && !motionCalm) {          // 最上位だけは画面ごと沸かせる
+    flashScreen('hard'); ringBurst(3); shake(2.4);
+    setTimeout(() => sfx.jackpot(), 120);
+  }
   const rk = $('overlay-rank');
   if (rank) {
     rk.classList.remove('hidden', 's', 'c');
@@ -2133,7 +2189,7 @@ const BRIEF = {
     lead: '集めた駒と能力を持ち帰って、対戦の編成にする。',
     lines: [
       ['増', '階を抜けるたび、敵の駒がまるごと手に入り、能力をひとつ選べる'],
-      ['失', '討ち死にすると、その潜行で集めたものは<b>すべて消える</b>'],
+      ['失', '討ち死にすると、その潜行で集めたものは<b>すべて消える</b>(1階だけは一度立て直せる)'],
       ['持', '突破のたびに撤退できる。撤退すれば、そのときの編成を<b>持ち帰れる</b>'],
     ],
     go: '潜行開始', goSub: '第1階へ降りる',
