@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788656591">
+<link rel="stylesheet" href="style.css?v=1788657549">
 </head>
 <body>
 <div id="crt"></div>
@@ -19,13 +19,18 @@
 <div id="tutorial" class="screen hidden">
   <p class="tag" id="tut-step">01 / 06</p>
   <h2 class="screen-title" id="tut-title"></h2>
-  <div id="tut-fig" class="tut-fig"></div>
-  <p id="tut-text" class="tut-text"></p>
+  <div class="screen-body">
+    <div id="tut-fig" class="tut-fig"></div>
+    <p id="tut-text" class="tut-text"></p>
+  </div>
   <div class="menu">
     <button id="tut-next" class="mi primary"><span class="mi-no">▶</span>
       <span class="mi-body"><b>つぎへ</b></span><span class="mi-rule"></span><i>next</i></button>
     <button id="tut-prev" class="mi"><span class="mi-no">◀</span>
       <span class="mi-body"><b>もどる</b></span><span class="mi-rule"></span><i>back</i></button>
+    <button id="tut-guide" class="mi"><span class="mi-no">駒</span>
+      <span class="mi-body"><b>駒の動き</b><span class="mi-sub">一覧で見る。対局中もHUDの「駒」から</span></span>
+      <span class="mi-rule"></span><i>pieces</i></button>
     <button id="tut-skip" class="mi"><span class="mi-no">×</span>
       <span class="mi-body"><b>とばす</b><span class="mi-sub">あとでタイトルの「あそびかた」から見られます</span></span>
       <span class="mi-rule"></span><i>skip</i></button>
@@ -74,13 +79,28 @@
 
   <p id="best-record" class="record"></p>
 
-  <details class="rules">
-    <summary>駒の動き</summary>
-    <div class="rules-body">
+
+</div>
+
+<!-- ============ 駒の動きと手持ちの能力 ============ -->
+<div id="guide" class="screen hidden">
+  <p class="tag">REFERENCE</p>
+  <h2 class="screen-title">駒 と 能力</h2>
+  <div class="screen-body">
+    <div class="guide-tabs">
+      <button class="gt on" data-gt="pieces">駒の動き</button>
+      <button class="gt" data-gt="abils">いまの能力</button>
+    </div>
+    <div id="guide-pieces">
       <div id="piece-guide" class="piece-guide"></div>
       <p class="note">緑のマスへ進めます。飛・角・香は駒に当たるまで走ります。桂だけは間の駒を飛び越えます。</p>
     </div>
-  </details>
+    <div id="guide-abils" class="hidden"></div>
+  </div>
+  <div class="menu">
+    <button id="btn-guide-back" class="mi"><span class="mi-no">◀</span>
+      <span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+  </div>
 </div>
 
 <!-- ============ 出撃前の説明 ============ -->
@@ -104,6 +124,7 @@
   <p class="tag">versus</p>
   <h2 class="screen-title">対戦</h2>
 
+  <div class="screen-body">
   <!-- 手順1: 相手を選ぶ -->
   <p class="step-head"><b>1</b>だれと</p>
   <nav class="menu mode-menu" id="mode-menu">
@@ -160,6 +181,7 @@
     </div>
   </div>
   <p class="hint" id="setup-hint"></p>
+  </div>
 
   <div class="menu">
     <button id="btn-setup-start" class="mi primary"><span class="mi-no">▶</span>
@@ -176,6 +198,7 @@
   <p class="deck-step" id="deck-step"></p>
   <h2 class="screen-title" id="deck-title">編成</h2>
 
+  <div class="screen-body">
   <div class="deck-sec" id="deck-sec-pieces">
     <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
     <p class="hint" id="deck-piece-hint"></p>
@@ -195,6 +218,8 @@
     <div id="deck-abilities" class="deck-abilities"></div>
   </div>
 
+  </div>
+
   <div class="menu deck-menu">
     <button id="btn-deck-ok" class="mi primary"><span class="mi-no">▶</span><span class="mi-body"><b>決　定</b><span class="mi-sub">この編成で始める</span></span><span class="mi-rule"></span><i>confirm</i></button>
     <button id="btn-deck-auto" class="mi"><span class="mi-no">＊</span><span class="mi-body"><b>おまかせ</b><span class="mi-sub">駒と能力をまとめて組む</span></span><span class="mi-rule"></span><i>auto</i></button>
@@ -207,7 +232,7 @@
   <p class="tag" id="presets-tag">UNITS</p>
   <h2 class="screen-title" id="presets-title">保存した編成</h2>
   <p class="hint" id="presets-hint"></p>
-  <div id="preset-list" class="preset-list"></div>
+  <div class="screen-body"><div id="preset-list" class="preset-list"></div></div>
   <div class="menu">
     <button id="btn-presets-versus" class="mi primary hidden"><span class="mi-no">▶</span>
       <span class="mi-body"><b>この編成で対戦</b><span class="mi-sub" id="pv-sub"></span></span>
@@ -229,6 +254,7 @@
     </div>
     <div class="hud-right">
       <span id="score" class="score">0</span>
+      <button id="btn-guide" class="icon-btn" title="駒の動きと能力">駒</button>
       <button id="btn-sound" class="icon-btn on">♪</button>
       <button id="btn-settings-2" class="icon-btn">=</button>
     </div>
@@ -342,6 +368,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788656591"></script>
+<script src="game.js?v=1788657549"></script>
 </body>
 </html>

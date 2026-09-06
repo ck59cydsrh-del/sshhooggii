@@ -78,7 +78,7 @@ body{
   font-family:var(--sans);
   font-weight:400;
   font-feature-settings:"tnum" 1;
-  min-height:100vh;
+  min-height:100dvh;height:100dvh;
   display:flex;justify-content:center;
   padding:max(34px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
           max(64px, calc(env(safe-area-inset-bottom) + 40px)) max(24px, env(safe-area-inset-left));
@@ -99,6 +99,24 @@ body{
 @keyframes flashHard{0%{opacity:.42}40%{opacity:.10}70%{opacity:.24}100%{opacity:0}}
 
 .screen{width:100%;max-width:430px;position:relative;z-index:1}
+/* 骨組みは動かさず、量が変わる中身だけを内側でスクロールさせる。
+   見出しと決定ボタンが常に見えるので、画面ごと流れるより追いやすい。 */
+.screen:has(> .screen-body){display:flex;flex-direction:column;max-height:100%}
+.screen-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  /* 続きがあることを、下端の細い翳りで示す */
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}
+.screen-body>:last-child{margin-bottom:22px}
+.screen-body::-webkit-scrollbar{width:3px}
+.screen-body::-webkit-scrollbar-thumb{background:var(--g26)}
+.screen-body::-webkit-scrollbar-track{background:transparent}
+.screen-body{scrollbar-width:thin;scrollbar-color:var(--g26) transparent}
+/* 縦が足りない機では、画面ごと流れる従来の形に戻す */
+@media (max-height:560px){
+  .screen:has(> .screen-body){display:block;max-height:none}
+  .screen-body{overflow:visible;mask-image:none;-webkit-mask-image:none}
+}
 .hidden{display:none !important}
 
 /* ---------- 共通 ---------- */
@@ -980,3 +998,13 @@ body.calm .brief-line{opacity:1;animation:none}
 .pc.flyer{position:fixed;z-index:80;pointer-events:none;
   transition:transform .4s var(--jelly-soft),opacity .4s linear}
 body.calm .pc.flyer{display:none}
+
+/* 駒と能力の早見 */
+.guide-tabs{display:flex;gap:0;border-bottom:1px solid var(--ink);margin-bottom:16px}
+.gt{font-family:var(--sans);font-size:10.5px;letter-spacing:.16em;cursor:pointer;
+  background:transparent;border:0;color:var(--g45);padding:9px 14px;min-height:36px}
+.gt.on{color:var(--ink);box-shadow:inset 0 -2px 0 var(--green)}
+.ga-head{font-size:10px;letter-spacing:.2em;color:var(--ink);margin:14px 0 8px;
+  border-bottom:1px solid var(--g12);padding-bottom:6px}
+.ga-head:first-child{margin-top:0}
+#guide-abils .pb-abils{margin-bottom:18px}

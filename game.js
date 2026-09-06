@@ -1909,7 +1909,7 @@ let briefThen = null;
 function openBrief(kind, then) {
   const b = BRIEF[kind];
   briefThen = then;
-  ['title','game','setup','deck','presets','tutorial'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','deck','presets','tutorial','guide'].forEach(id => $(id).classList.add('hidden'));
   $('brief').classList.remove('hidden');
   $('brief-tag').textContent = b.tag;
   $('brief-title').textContent = b.title;
@@ -1935,18 +1935,24 @@ function openBrief(kind, then) {
                    : 'まだ持ち帰りがないので、いまは既定編成だけで戦えます';
 }
 $('btn-brief-go').addEventListener('click', () => { sfx.ui(); const f = briefThen; briefThen = null; if (f) f(); });
+$('btn-guide').addEventListener('click', () => { sfx.ui(); openGuide('game'); });
+$('btn-guide-back').addEventListener('click', () => {
+  sfx.ui();
+  if (guideFrom === 'game') { $('guide').classList.add('hidden'); $('game').classList.remove('hidden'); }
+  else toTitle();
+});
 $('btn-brief-back').addEventListener('click', () => { sfx.ui(); toTitle(); });
 
 function toTitle() {
   gen++;
   busy = false;
   $('btn-presets-back').classList.remove('danger');
-  ['game','setup','presets','deck','tutorial','brief'].forEach(id => $(id).classList.add('hidden'));
+  ['game','setup','presets','deck','tutorial','brief','guide'].forEach(id => $(id).classList.add('hidden'));
   $('title').classList.remove('hidden');
   showBest();
 }
 function toGame() {
-  ['title','setup','presets','deck','tutorial','brief'].forEach(id => $(id).classList.add('hidden'));
+  ['title','setup','presets','deck','tutorial','brief','guide'].forEach(id => $(id).classList.add('hidden'));
   $('game').classList.remove('hidden');
 }
 function showBest() {
@@ -2030,7 +2036,7 @@ function presetBody(p) {
 function openPresets(m, savedIdx = -1, keepOpen = false) {
   presetMode = m;
   pendingSlot = -1; abandonArmed = false;
-  ['title','game','setup','deck','brief'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','deck','brief','guide'].forEach(id => $(id).classList.add('hidden'));
   $('presets').classList.remove('hidden');
   const data = loadPresets();
   const have = data.filter(Boolean).length;
@@ -2456,7 +2462,7 @@ function showNote(selId, noteId) {
       + (abNames.length ? `<span class="note-ab">初期の能力 ${abNames.join(' / ')}</span>` : '');
 }
 function openSetup(prefer) {
-  ['title','game','presets','deck','brief'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','presets','deck','brief','guide'].forEach(id => $(id).classList.add('hidden'));
   $('setup').classList.remove('hidden');
   fillSelect($('sel-sente')); fillSelect($('sel-gote'));
   $('sel-sente').value = prefer || defaultSide();
@@ -2886,6 +2892,54 @@ const PIECE_GUIDE = [
   ['B', true,  '馬(成角)', '角にたて・よこ1つが加わる'],
   ['P', true,  'と(成歩)', '金と同じ動きになる'],
 ];
+/* 駒の動きと、いま持っている能力。潜行中や対局中にも開ける。
+   ルールを覚えていなくても、その場で確かめられるようにする。 */
+let guideFrom = 'title';
+function openGuide(from) {
+  guideFrom = from || 'title';
+  ['title','game','setup','deck','presets','tutorial','brief'].forEach(id => $(id).classList.add('hidden'));
+  $('guide').classList.remove('hidden');
+  renderPieceGuide();
+  renderGuideAbils();
+  guideTab('pieces');
+}
+function guideTab(which) {
+  $('guide-pieces').classList.toggle('hidden', which !== 'pieces');
+  $('guide-abils').classList.toggle('hidden', which !== 'abils');
+  [...document.querySelectorAll('.gt')].forEach(b => b.classList.toggle('on', b.dataset.gt === which));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.gt');
+  if (b) { sfx.ui(); guideTab(b.dataset.gt); }
+});
+
+/* いま効いている能力。ソロは自分のぶん、対戦は自分と相手を並べる */
+function renderGuideAbils() {
+  const box = $('guide-abils');
+  const rows = (own, label) => {
+    const ids = Object.keys(own || {}).filter(id => ABI_BY_ID[id] && own[id]);
+    if (!ids.length) return `<p class="ga-head">${label}</p><p class="note">まだ何もありません。</p>`;
+    return `<p class="ga-head">${label}</p>` + ids
+      .sort((a, b) => ABI_BY_ID[b].r - ABI_BY_ID[a].r)
+      .map(id => {
+        const a = ABI_BY_ID[id];
+        return `<div class="pb-ab r${a.r}">
+          <span class="pb-r">${RARITY[a.r]}</span>
+          <span class="pb-n"><b>${a.n}</b>${own[id] > 1 ? `<i>×${own[id]}</i>` : ''}
+            <span class="pb-y">${yomi(id)}</span></span>
+          <span class="pb-tag">${catOf(id)}</span>
+          <span class="pb-d">${a.d}${DIAG_PIECE[id] ? diagramSVG(id) : ''}</span>
+        </div>`;
+      }).join('');
+  };
+  if (mode === 'versus' && match) {
+    box.innerHTML = `<div class="pb-abils">${rows(sideAb[SENTE], '自分')}</div>`
+                  + `<div class="pb-abils">${rows(sideAb[GOTE], '相手')}</div>`;
+  } else {
+    box.innerHTML = `<div class="pb-abils">${rows(run ? run.abilities : {}, 'この潜行で修得した能力')}</div>`;
+  }
+}
+
 function renderPieceGuide() {
   const box = $('piece-guide');
   if (!box || box.childElementCount) return;
@@ -2977,7 +3031,7 @@ let tutStep = 0;
 function openTutorial(from) {
   tutStep = 0;
   tutorialFrom = from || 'title';
-  ['title','game','setup','deck','presets','brief'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','deck','presets','brief','guide'].forEach(id => $(id).classList.add('hidden'));
   $('tutorial').classList.remove('hidden');
   renderTutorial();
 }
@@ -3003,6 +3057,7 @@ $('tut-next').addEventListener('click', () => {
 });
 $('tut-prev').addEventListener('click', () => { sfx.ui(); if (tutStep > 0) { tutStep--; renderTutorial(); } });
 $('tut-skip').addEventListener('click', () => { sfx.ui(); closeTutorial(); });
+$('tut-guide').addEventListener('click', () => { sfx.ui(); openGuide('title'); });
 $('btn-howto').addEventListener('click', () => { primeAudio(); sfx.ui(); openTutorial('title'); });
 
 /* ---------- 設定 ---------- */
