@@ -898,7 +898,24 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 .overlay-card::-webkit-scrollbar,.draft-card::-webkit-scrollbar{display:none}
 .overlay-card{width:100%;max-width:290px}
 /* 勝ち負けは字だけでなく、面の出かたでも分かるようにする */
-.overlay.win #overlay-title{color:var(--green)}
+.overlay.win #overlay-title{color:var(--green);font-family:var(--mincho);font-size:46px;
+  letter-spacing:.26em;position:relative;animation:winSlam .7s cubic-bezier(.16,1.7,.3,1) both}
+@keyframes winSlam{
+  0%{opacity:0;transform:scale(.6) skewX(-12deg)}
+  30%{opacity:1;transform:scale(1.14) skewX(0)}
+  46%{transform:scale(1)}
+  100%{opacity:1;transform:scale(1)}
+}
+/* 勝ったときだけ広がる輪 */
+.ov-ring{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;
+  border:2px solid var(--green);border-radius:50%;pointer-events:none;z-index:0;
+  animation:ovRing .9s var(--jelly-soft) both}
+@keyframes ovRing{
+  from{width:50px;height:50px;margin:-25px 0 0 -25px;opacity:.75}
+  to{width:820px;height:820px;margin:-410px 0 0 -410px;opacity:0;border-width:1px}
+}
+.overlay-card{position:relative;z-index:1}
+body.calm .overlay.win #overlay-title{animation:none}
 .overlay.win .overlay-card{border-top:3px solid var(--green);padding-top:18px}
 .overlay.lose .overlay-card{border-top:3px solid var(--ink);padding-top:18px}
 .overlay.lose #overlay-title{color:var(--g70)}

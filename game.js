@@ -2156,7 +2156,11 @@ function takeAbility(a) {
   const next = afterDraft;
   afterDraft = null;
   if (next) next();
-  setTimeout(() => announce(a.id, '修得した'), 60);   // 何を手に入れたのかを盤に刻む
+  // 続けて引く場面(潜行の頭)では、間に盤を挟まず二つまとめて出す
+  setTimeout(() => {
+    annQueue.push([a.id, '修得した']);
+    if ($('draft').classList.contains('hidden')) flushAnnounce();
+  }, 60);
 }
 function openAbilityList(side) {
   const box = $('ability-list');
@@ -2196,6 +2200,21 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '
   if (rank === 'S' && !motionCalm) {          // 最上位だけは画面ごと沸かせる
     flashScreen('hard'); ringBurst(3); shake(2.4);
     setTimeout(() => sfx.jackpot(), 120);
+  }
+  // 勝ち切った瞬間は、輪を重ねて画面ごと持ち上げる
+  if (mood === 'win' && !motionCalm) {
+    const ov = $('overlay');
+    ov.querySelectorAll('.ov-ring').forEach(e => e.remove());
+    for (let i = 0; i < 3; i++) {
+      const r = document.createElement('div');
+      r.className = 'ov-ring';
+      r.style.animationDelay = (i * 130) + 'ms';
+      ov.appendChild(r);
+      setTimeout(() => r.remove(), 1100 + i * 130);
+    }
+    shake(2.6);
+    setTimeout(() => { sfx.jackpot(); shake(1.8); }, 260);
+    setTimeout(() => sfx.power(3), 520);
   }
   const rk = $('overlay-rank');
   if (rank) {
@@ -2971,8 +2990,9 @@ function showMatchup(a, b, then) {
     box.querySelectorAll('.mu-kick, .mu-ring').forEach(e => e.remove());
     // 墨に落ちきっていれば、そのまま帯へ渡す(溶かすと紙が一瞬覗く)
     if (box.classList.contains('go')) {
+      then();                                   // 先に盤を組んでおく
       box.classList.add('hidden'); box.classList.remove('go');
-      then(); return;
+      return;
     }
     box.classList.add('out');                    // 消えぎわを溶かす
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
@@ -3053,7 +3073,7 @@ $('btn-setup-start').addEventListener('click', async () => {
       const theirs = (meta && meta[foe]) || randomFoe();
       lastVersus = net.seat === SENTE ? { s:deck, g:theirs } : { s:theirs, g:deck };
       showMatchup(lastVersus.s, lastVersus.g,
-        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, false); }, 'round'));
+        () => { toGame(); startMatch(lastVersus.s, lastVersus.g, false); });
     });
     return;
   }
@@ -3062,12 +3082,12 @@ $('btn-setup-start').addEventListener('click', async () => {
     if (cpu) {
       lastVersus = { s:deckS, g:randomFoe() };
       return showMatchup(lastVersus.s, lastVersus.g,
-        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, true); }, 'round'));
+        () => { toGame(); startMatch(lastVersus.s, lastVersus.g, true); });
     }
     openDeck(GOTE, srcG, deckG => {
       lastVersus = { s:deckS, g:deckG };
       showMatchup(deckS, deckG,
-        () => floorTransition(1, () => { toGame(); startMatch(deckS, deckG, false); }, 'round'));
+        () => { toGame(); startMatch(deckS, deckG, false); });
     });
   });
 });
