@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788659691">
+<link rel="stylesheet" href="style.css?v=1788661520">
 </head>
 <body>
 <div id="crt"></div>
@@ -213,7 +213,7 @@
   <div class="deck-sec hidden" id="deck-sec-abils">
     <p class="deck-head"><span>能力</span><b id="deck-cost">コスト 0 / 10　枠 0 / 5</b></p>
     <div id="deck-meter" class="deck-meter"></div>
-    <p class="hint">並2 / 希4 / 極10。潜って修得した能力は1安い。選んだものは上に並びます。</p>
+    <p class="hint" id="deck-ab-hint"></p>
     <div id="deck-filter" class="deck-filter"></div>
     <div id="deck-abilities" class="deck-abilities"></div>
   </div>
@@ -255,7 +255,7 @@
     <div class="hud-right">
       <span id="score" class="score">0</span>
       <div class="hud-btns">
-        <button id="btn-guide" class="icon-btn" title="駒の動きと能力">駒</button>
+        <button id="btn-guide" class="icon-btn" title="駒の動きと、いま持っている能力">?</button>
         <button id="btn-sound" class="icon-btn on">♪</button>
         <button id="btn-settings-2" class="icon-btn">=</button>
       </div>
@@ -370,6 +370,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788659691"></script>
+<script src="game.js?v=1788661520"></script>
 </body>
 </html>

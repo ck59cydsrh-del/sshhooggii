@@ -78,7 +78,8 @@ body{
   font-family:var(--sans);
   font-weight:400;
   font-feature-settings:"tnum" 1;
-  min-height:100dvh;height:100dvh;
+  min-height:100vh;height:100vh;
+  overflow:hidden;overscroll-behavior:none;
   display:flex;justify-content:center;
   padding:max(34px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
           max(64px, calc(env(safe-area-inset-bottom) + 40px)) max(24px, env(safe-area-inset-left));
@@ -115,9 +116,13 @@ body{
 .screen-body::-webkit-scrollbar-track{background:transparent}
 .screen-body{scrollbar-width:thin;scrollbar-color:var(--g26) transparent}
 /* 縦が足りない機では、画面ごと流れる従来の形に戻す */
+@supports (height:100svh){ body{min-height:100svh;height:100svh} }
+/* 縦が足りない機では、画面ごと流れる従来の形に戻す */
 @media (max-height:560px){
+  body{height:auto;min-height:100vh;overflow:auto}
   .screen:has(> .screen-body){display:block;max-height:none}
   .screen-body{overflow:visible;mask-image:none;-webkit-mask-image:none}
+  #game{height:auto}
 }
 .hidden{display:none !important}
 
@@ -491,8 +496,8 @@ body.calm .preset-body{animation:none}
 #game{display:flex;flex-direction:column;height:100%;min-height:0}
 #game>*{flex:none}                      /* 縦に潰れると字が切れる */
 /* 盤の枠だけが残りの高さを引き受ける */
-#game>.board-frame{flex:1 1 0;min-height:0}
-#game .board-row{flex:1 1 0;min-height:0}
+#game>.board-frame{flex:1 1 0;min-height:0;align-items:center}
+#game .board-row{flex:1 1 0;min-height:0;justify-content:center}
 #game #board-wrap{min-height:0;flex:0 0 auto;display:flex;align-items:center;justify-content:flex-start}
 /* 盤の一辺は fitBoard() が測って入れる。筋のラベルも同じ幅に合わせる */
 #game #board{width:100%;height:auto;aspect-ratio:1/1;margin:0}
@@ -750,8 +755,14 @@ body.calm #transition.run,body.calm .stamp,
 body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 
 /* ---------- オーバーレイ ---------- */
-.overlay{position:absolute;inset:0;background:var(--paper);
-  display:flex;align-items:center;justify-content:center;padding:22px;z-index:7}
+/* 盤の中に収めると中身が溢れて駒台に重なる(能力の3択で実際に重なった)。
+   報酬の場面なので、画面ごと覆って選ぶことだけに集中させる。 */
+.overlay{position:fixed;inset:0;background:var(--paper);
+  display:flex;align-items:center;justify-content:center;z-index:60;
+  padding:max(24px, env(safe-area-inset-top)) 24px max(24px, calc(env(safe-area-inset-bottom) + 16px))}
+.overlay-card,.draft-card{max-height:100%;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:none}
+.overlay-card::-webkit-scrollbar,.draft-card::-webkit-scrollbar{display:none}
 .overlay-card{width:100%;max-width:290px}
 #overlay-title{font-family:var(--didone);font-size:28px;letter-spacing:.16em;
   margin-bottom:18px;line-height:1.35;font-weight:400}
@@ -767,7 +778,7 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 .rank.c b{color:var(--g26)}
 
 /* ---------- 能力ドラフト ---------- */
-.draft-card{width:100%;max-width:308px}
+.draft-card{width:100%;max-width:330px}
 .draft-head{font-size:10px;letter-spacing:.22em;color:var(--g70);margin-bottom:16px}
 .draft-choices{display:flex;flex-direction:column;gap:9px;border:0}
 
@@ -866,7 +877,9 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 .ap{display:inline-flex;align-items:baseline;gap:2px;border:1px solid var(--g26);padding:2px 6px}
 .ap b{font-family:var(--mincho);font-size:14px;font-weight:400;letter-spacing:.06em}
 .ap i{font-style:normal;font-size:9.5px;color:var(--g45)}
-.ap-sum{font-size:9.5px;letter-spacing:.12em;color:var(--g45);margin-left:auto}
+.ap-sum{font-size:9.5px;letter-spacing:.12em;color:var(--g45);margin-left:auto;text-align:right}
+.ap-sum b{font-weight:400;color:var(--ink)}
+.ap-rel{display:block;font-size:8.5px;letter-spacing:.06em;color:var(--g45);margin-top:3px}
 .ap-none{font-size:9.5px;letter-spacing:.08em;color:var(--g26)}
 .army-abils{display:flex;flex-wrap:wrap;gap:6px 12px;margin-bottom:8px;min-height:14px}
 .vs-mark{font-family:var(--mincho);font-size:13px;letter-spacing:.3em;color:var(--g26);
@@ -1001,7 +1014,7 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 .army-tag{font-family:var(--sans);font-size:9px;letter-spacing:.14em;
   color:var(--g45);border:1px solid var(--g12);padding:3px 7px;white-space:nowrap}
 .army-tag.dive{background:var(--glow);border-color:var(--ink);color:var(--ink)}
-.army.is-dive{border-left:2px solid var(--green);padding-left:11px}
+.army.is-dive{border-top-color:var(--green);border-top-width:2px;padding-top:11px}
 .army-note .note-ab{display:block;margin-top:4px;color:var(--g45)}
 .army-note b{color:var(--ink);font-weight:400}
 /* 段の番号は、そこが本題であることの印 */
@@ -1040,3 +1053,9 @@ body.calm .pc.flyer{display:none}
   border-bottom:1px solid var(--g12);padding-bottom:6px}
 .ga-head:first-child{margin-top:0}
 #guide-abils .pb-abils{margin-bottom:18px}
+
+/* スコアで伸びた予算 */
+.deck-head .bonus{font-style:normal;font-size:9px;letter-spacing:.1em;color:var(--green);
+  margin-left:3px}
+.deck-meter b.bonus{background:var(--green)}
+.deck-meter b.bonus.spent{background:transparent;box-shadow:inset 0 0 0 1px var(--green)}

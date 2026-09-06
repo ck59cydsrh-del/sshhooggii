@@ -99,11 +99,15 @@ const ABILITIES = [
   { id:'hunter',   n:'狩人',   r:1, d:'守備隊を狩り尽くして突破すると、スコア2倍' },
   { id:'decap',    n:'首狩り', r:1, d:'玉を取って突破すると、速攻ボーナスが2倍' },
   { id:'massacre', n:'皆殺し', r:3, d:'狩り尽くして突破すると、その階の戦果をさらに2組もらう' },
+  { id:'avalanche',n:'雪崩',   r:3, d:'駒を取ると、盤に残る同じ種類の敵の駒もまとめて奪う' },
+  { id:'goldRush', n:'黄金律', r:3, d:'取った駒はすべて金になる' },
 
   // --- 連鎖 ---
   { id:'chainMult',  n:'連鎖倍加', r:2, d:'連鎖1つあたりのスコア倍率が2倍になる' },
   { id:'chainRush',  n:'連鎖疾走', r:3, d:'連鎖3以上のあいだ、手数を消費しない' },
   { id:'chainBlast', n:'連鎖爆風', r:3, d:'連鎖5以上で取ると、その隣にいる敵の駒も巻き込んで取る' },
+  { id:'crossCut',   n:'一網打尽', r:3, d:'連鎖5以上で取ると、その筋と段にいる敵の駒を全部巻き込む' },
+  { id:'doubleDown', n:'倍賭け',   r:2, d:'連鎖1つにつきスコア倍率 +0.5(連鎖が切れると戻る)' },
 
   // --- 崩壊 ---
   { id:'collapseGuard', n:'支柱',   r:1, d:'崩壊が始まってから3手は増援が降らない' },
@@ -145,9 +149,9 @@ const CAT = {
   成り:['zone2','dropPromoted','promoteChain'],
   打込:['nifuOk','dropAny','dropStrike','noEnemyDrop','fortress'],
   手番:['extraTurn','extraTurn2','firstStrike'],
-  略奪:['duplicate','spoils','sweep'],
+  略奪:['duplicate','spoils','sweep','avalanche','goldRush'],
   狩り:['hunter','decap','massacre'],
-  連鎖:['chainMult','chainRush','chainBlast','comboKeep','chainStart'],
+  連鎖:['chainMult','chainRush','chainBlast','crossCut','comboKeep','chainStart','doubleDown'],
   崩壊:['collapseGuard','overtime','deadline','warBonds'],
   生存:['revive','revive2','sacrifice'],
   地形:['terrainMine','demolish'],
@@ -169,6 +173,7 @@ const YOMI = {
   tax:'chozei', tax2:'juzei', tribute:'mitsugimono', interest:'risoku',
   warChest:'gunshikin', vanguard:'senkentai', smelt:'itsubushi', recycle:'sairiyo',
   pawnRun:'idaten', rookDragon:'hiryu', bishopHorse:'kakuma', goldKing:'kongo',
+  avalanche:'nadare', goldRush:'ougonritsu', crossCut:'ichimou dajin', doubleDown:'baigake',
   silverWide:'ginrei', silverBack:'gin no kikan', knightBack:'gyakubane',
   knightFar:'obane', lanceBack:'sokyo', kingRun:'idaten gyoku',
   pawnDiag:'hohei totsugeki', tokinPlus:'tokin muso',
@@ -209,6 +214,12 @@ const VS_ABILITIES = ABILITIES.filter(a => VS_OK.has(a.id));
 const AB_COST      = { 1:2, 2:4, 3:10 };   // 既定編成
 const AB_COST_DIVE = { 1:1, 2:2, 3:5  };   // 潜って持ち帰った編成
 const DECK_BUDGET = 10, DECK_SLOTS = 5, DECK_PIECES = 10;
+/* 潜ったスコアを対戦へ持ち込む。深く潜った編成だけ予算が少し伸びる。
+   枠(5)は増えないので、上積みは「もう一段いいものを積める」程度に留まる。 */
+const SCORE_PER_BUDGET = 300000, BUDGET_BONUS_MAX = 2;
+const budgetBonus = src =>
+  (src && src.editable) ? Math.min(BUDGET_BONUS_MAX, Math.floor((src.score || 0) / SCORE_PER_BUDGET)) : 0;
+let deckBudget = DECK_BUDGET;      // いま編成中の予算(スコア分を含む)
 const abCost = (a, dive) => (dive ? AB_COST_DIVE : AB_COST)[a.r];
 const deckCost = (abils, dive) =>
   Object.keys(abils).reduce((s, id) =>
@@ -391,7 +402,10 @@ function make(pos, mv) {
       u.cap = { ...cap };
       if (cap.t !== 'K' && banks(mover)) {
         const dup = ab(mover,'duplicate') ? 2 : 1;
-        pos.h[mover][cap.t] = (pos.h[mover][cap.t] || 0) + dup;
+        // 黄金律は取った駒を金にして持ち帰る。戻すときの種類は u.bank に控える
+        const t = ab(mover,'goldRush') ? 'G' : cap.t;
+        u.bank = t;
+        pos.h[mover][t] = (pos.h[mover][t] || 0) + dup;
       }
     }
     u.wasPr = p.pr;
@@ -411,7 +425,7 @@ function unmake(pos, mv, u) {
     const p = pos.b[mv.to];
     pos.b[mv.from] = p.pr !== u.wasPr ? { ...p, pr:u.wasPr } : p;
     pos.b[mv.to] = u.cap || null;
-    if (u.cap && u.cap.t !== 'K' && banks(mover)) pos.h[mover][u.cap.t] -= ab(mover,'duplicate') ? 2 : 1;
+    if (u.bank) pos.h[mover][u.bank] -= ab(mover,'duplicate') ? 2 : 1;
   }
 }
 
@@ -804,12 +818,20 @@ function fitBoard() {
   board.style.width = px;
   if (files) files.style.width = px;
 }
-if (typeof ResizeObserver !== 'undefined') {
-  const ro = new ResizeObserver(() => fitBoard());
-  addEventListener('DOMContentLoaded', () => { const w = $('board-wrap'); if (w) ro.observe(w); });
-  if (document.readyState !== 'loading') { const w = $('board-wrap'); if (w) ro.observe(w); }
+/* 監視の中で寸法を書き換えると同じフレームで回り続けるので、1フレーム待つ */
+let fitQueued = false;
+function queueFit() {
+  if (fitQueued) return;
+  fitQueued = true;
+  requestAnimationFrame(() => { fitQueued = false; fitBoard(); });
 }
-addEventListener('resize', fitBoard);
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(queueFit);
+  const watch = () => { const el = document.querySelector('#game .board-row'); if (el) ro.observe(el); };
+  addEventListener('DOMContentLoaded', watch);
+  if (document.readyState !== 'loading') watch();
+}
+addEventListener('resize', queueFit);
 
 function repaint() {
   render();
@@ -1061,6 +1083,7 @@ function scoreMult() {
     if (ab(SENTE,'warBonds') && hand >= 10) m += 1;
     if (ab(SENTE,'deadline') && floorState.movesLeft <= 5 && floorState.movesLeft >= 0) m *= 2;
     if (ab(SENTE,'overtime') && floorState.movesLeft < 0) m *= 3;
+    if (ab(SENTE,'doubleDown')) m += 0.5 * floorState.combo * ab(SENTE,'doubleDown');
     if (floorState.combo >= 5) m *= 1.5;                 // FEVER
   }
   return m;
@@ -1400,6 +1423,14 @@ function applyMove(mv, fromNet) {
     burst(mv.to); shake(captured.t === 'R' || captured.t === 'B' ? 1.6 : 1);
     if (ab(mover,'duplicate')) { msg += ' 複製!'; announce('duplicate', `${NAME[captured.t]}が2枚になった`); }
     if (ab(mover,'promoteChain') && promoteOne(mover)) { msg += ' 昇格伝染!'; announce('promoteChain'); }
+    if (mover === SENTE && ab(SENTE,'avalanche')) {
+      const n = avalanche(captured.t);
+      if (n) { msg += ` 雪崩 ${n}枚!`; announce('avalanche', `${NAME[captured.t]}を盤から${n}枚さらった`); }
+    }
+    if (mover === SENTE && ab(SENTE,'crossCut') && floorState.combo >= 5) {
+      const n = crossCut(mv.to);
+      if (n) { msg += ` 一網打尽 ${n}枚!`; announce('crossCut', `筋と段の${n}枚を薙いだ`); }
+    }
     if (mover === SENTE && ab(SENTE,'chainBlast') && floorState.combo >= 5) {
       const n = chainBlast(mv.to);
       if (n) { msg += ` 爆風 ${n}枚!`; announce('chainBlast', `隣の${n}枚を巻き込んだ`); }
@@ -1498,23 +1529,50 @@ function floorBudget(floor) {
 
 /* 連鎖爆風: 取ったマスの隣接4マスにいる敵の駒も巻き込む(玉は巻き込めない) */
 function chainBlast(at) {
-  const r = rowOf(at), c = colOf(at);
-  let n = 0;
+  const r = rowOf(at), c = colOf(at), list = [];
   for (const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
     const nr = r+dr, nc = c+dc;
     if (nr<0||nr>=R||nc<0||nc>=C) continue;
-    const ni = nr*C+nc, q = pos.b[ni];
+    list.push(nr*C+nc);
+  }
+  return engulf(list, '爆風');
+}
+
+/* 巻き込んだ駒を実際に奪う。連鎖爆風・一網打尽・雪崩で共通に使う */
+function engulf(list, label) {
+  let n = 0;
+  for (const ni of list) {
+    const q = pos.b[ni];
     if (!q || q.o !== GOTE || q.t === 'K') continue;
     pos.b[ni] = null;
     const dup = ab(SENTE,'duplicate') ? 2 : 1;
-    pos.h.s[q.t] = (pos.h.s[q.t] || 0) + dup;
-    floorState.captured[q.t] = (floorState.captured[q.t] || 0) + 1;
+    const t = ab(SENTE,'goldRush') ? 'G' : q.t;
+    pos.h.s[t] = (pos.h.s[t] || 0) + dup;
+    floorState.captured[t] = (floorState.captured[t] || 0) + 1;
     addScore(pieceVal(q) * scoreMult());
-    burst(ni); popText(ni, '爆風', 'warn');
+    burst(ni); popText(ni, label, 'warn');
     n++;
   }
   if (n) shake(2.2);
   return n;
+}
+
+/* 一網打尽: 取ったマスの筋と段を薙ぐ */
+function crossCut(at) {
+  const r = rowOf(at), c = colOf(at), list = [];
+  for (let i = 0; i < C; i++) { const k = r*C+i; if (k !== at) list.push(k); }
+  for (let i = 0; i < R; i++) { const k = i*C+c; if (k !== at) list.push(k); }
+  return engulf(list, '薙ぎ');
+}
+
+/* 雪崩: 盤に残る同じ種類の敵の駒をまとめて奪う */
+function avalanche(t) {
+  const list = [];
+  for (let i = 0; i < NS; i++) {
+    const q = pos.b[i];
+    if (q && q.o === GOTE && q.t === t && q.t !== 'K') list.push(i);
+  }
+  return engulf(list, '雪崩');
 }
 
 /* 崩壊: 手数を使い切った後は、一手ごとに敵の増援が降ってくる */
@@ -1929,6 +1987,7 @@ const BRIEF = {
     lines: [
       ['駒', '盤に出せるのは<b>10枚</b>。局ごとに先番が入れ替わる'],
       ['安', '持ち帰った編成は能力が<b>安い</b>(並1 / 希2 / 極5)。ただし修得したものだけ'],
+      ['深', '潜行のスコア30万ごとに<b>予算 +1</b>(最大 +2)。深く潜った編成ほど積める'],
       ['広', '既定編成は駒が固定。能力は<b>全種</b>から選べるが値は張る(並2 / 希4 / 極10)'],
     ],
     go: '編成を選ぶ', goSub: 'だれと → どの編成で → 駒 → 能力',
@@ -2208,6 +2267,7 @@ function pickSide(sel) {
   const p = loadPresets()[Number(v.slice(1))];
   return p
     ? { name:p.name, pool:p.pool, abilities:p.abilities || {}, editable:true,
+        score:p.score || 0, floor:p.floor || 0,      // 予算の上積みに使う
         note:`潜って持ち帰った${poolTotal(p.pool)}枚から選べます` }
     : STANDARD;
 }
@@ -2230,13 +2290,14 @@ function autoPieces(src) {
 
 /* おまかせ。修得済みを厚めに引きつつ毎回ばらけるよう、重み付きで抽選する。
    最後に余った予算は安いもので埋めて必ず使い切る。 */
-function autoAbilities(pool0, dive) {
+function autoAbilities(pool0, dive, budget) {
+  budget = budget || DECK_BUDGET;
   const chosen = {};
   const weight = a => (a.r === 3 ? 1 : a.r === 2 ? 2 : 3);
   const pool = pool0.filter(a => !a.req);
   const fits = (id) => {
     if (chosen[id] || Object.keys(chosen).length >= DECK_SLOTS) return false;
-    return deckCost({ ...chosen, [id]:1 }, dive) <= DECK_BUDGET;
+    return deckCost({ ...chosen, [id]:1 }, dive) <= budget;
   };
   for (let guard = 0; guard < 60; guard++) {
     const avail = pool.filter(a => fits(a.id));
@@ -2260,12 +2321,14 @@ function openDeck(side, src, next) {
   const choosable = dive ? VS_ABILITIES.filter(a => earned[a.id]) : VS_ABILITIES;
   deckFilter = null;
   deckStep = 'pieces';
+  const bonus = budgetBonus(src);
+  deckBudget = DECK_BUDGET + bonus;
   deckEdit = {
-    side, src, next, earned, dive, choosable,
+    side, src, next, earned, dive, choosable, bonus,
     fixed: !dive,                               // 既定編成は駒を固定
     available: { ...src.pool },
     pieces: dive ? autoPieces(src.pool) : { ...src.pool },
-    abilities: autoAbilities(choosable, dive),
+    abilities: autoAbilities(choosable, dive, deckBudget),
   };
   ['title','game','setup','presets','brief'].forEach(id => $(id).classList.add('hidden'));
   $('deck').classList.remove('hidden');
@@ -2320,13 +2383,19 @@ function renderDeck() {
   const cost = deckCost(d.abilities, d.dive);
   const slots = Object.keys(d.abilities).length;
   $('deck-cost').innerHTML =
-    `コスト <b class="${cost >= DECK_BUDGET ? 'full' : ''}">${cost}</b> / ${DECK_BUDGET}` +
+    `コスト <b class="${cost >= deckBudget ? 'full' : ''}">${cost}</b> / ${deckBudget}` +
     `　枠 <b class="${slots >= DECK_SLOTS ? 'full' : ''}">${slots}</b> / ${DECK_SLOTS}`;
+  $('deck-ab-hint').innerHTML = d.dive
+    ? `持ち帰った能力は<b>安い</b>(並1 / 希2 / 極5)。`
+      + (d.bonus ? `スコアで<b>予算 +${d.bonus}</b>。` : 'スコア30万ごとに予算 +1。')
+      + '選んだものは上に並びます。'
+    : '既定編成は 並2 / 希4 / 極10。選んだものは上に並びます。';
   const meter = $('deck-meter');
   meter.innerHTML = '';
-  for (let i = 0; i < DECK_BUDGET; i++) {
+  for (let i = 0; i < deckBudget; i++) {
     const b = document.createElement('b');
     if (i >= cost) b.className = 'spent';
+    if (i >= DECK_BUDGET) b.classList.add('bonus');    // スコアで伸びたぶん
     meter.appendChild(b);
   }
 
@@ -2359,7 +2428,7 @@ function renderDeck() {
     const c = abCost(a, d.dive);
     const wouldCost = cost + c;
     const blockedReq = a.req && !d.abilities[a.req];
-    const cannot = !on && (wouldCost > DECK_BUDGET || slots >= DECK_SLOTS || blockedReq);
+    const cannot = !on && (wouldCost > deckBudget || slots >= DECK_SLOTS || blockedReq);
     const row = document.createElement('button');
     row.className = `deck-ab r${a.r}` + (on ? ' on' : '') + (cannot ? ' off' : '');
     row.innerHTML =
@@ -2408,7 +2477,7 @@ $('btn-deck-auto').addEventListener('click', () => {
   const d = deckEdit;
   sfx.ui();
   if (deckStep === 'pieces') { if (!d.fixed) d.pieces = autoPieces(d.available); }
-  else d.abilities = autoAbilities(d.choosable, d.dive);
+  else d.abilities = autoAbilities(d.choosable, d.dive, deckBudget);
   renderDeck();
 });
 $('btn-deck-back').addEventListener('click', () => {
@@ -2457,7 +2526,11 @@ function renderArmy(selId, piecesId, abilsId, noteId) {
   const total = Object.values(shown).reduce((a, b) => a + b, 0);
   const sum = document.createElement('span');
   sum.className = 'ap-sum';
-  sum.textContent = `${total}枚 / 価値 ${value.toLocaleString('ja-JP')}`;
+  // 「価値」だけだと何の数字か分からないので、既定編成を基準に据える
+  const base = 1650;
+  const rel = value >= base * 1.25 ? '重い' : value <= base * 0.8 ? '軽い' : '標準';
+  sum.innerHTML = `${total}枚　<b>戦力 ${value.toLocaleString('ja-JP')}</b>`
+    + `<span class="ap-rel">既定編成およそ1,650 — ${rel}</span>`;
   pbox.appendChild(sum);
 
   const abils = Object.keys(src.abilities || {}).filter(id => VS_OK.has(id));
@@ -2573,7 +2646,8 @@ $('btn-setup-start').addEventListener('click', async () => {
     for (const id in (src.abilities || {})) if (VS_OK.has(id)) earned[id] = 1;
     const pool = dive ? VS_ABILITIES.filter(a => earned[a.id]) : VS_ABILITIES;
     return { name:src.name, pool: dive ? autoPieces(src.pool) : { ...src.pool },
-             abilities: autoAbilities(pool.length ? pool : VS_ABILITIES, dive) };
+             abilities: autoAbilities(pool.length ? pool : VS_ABILITIES, dive,
+                                       DECK_BUDGET + budgetBonus(src)) };
   };
   // CPUの編成はその場でランダムに決める
   const randomFoe = () => {
