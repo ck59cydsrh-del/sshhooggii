@@ -823,10 +823,12 @@ function fitBoard() {
   const wrap = $('board-wrap'), board = $('board'), files = $('files');
   if (!wrap || !board) return;
   const row = wrap.parentElement;                      // 盤と段のラベルが並ぶ行
+  const frame = row && row.parentElement;              // 中央寄せの枠
   const ranks = row && row.querySelector('.ranks');
-  if (!row || !row.clientHeight) return;
+  if (!row || !frame || !row.clientHeight) return;
   const gutter = ranks ? (ranks.offsetWidth + 9) * 2 : 0;   // 左右に同じ逃げを取る
-  const side = Math.max(150, Math.floor(Math.min(row.clientWidth - gutter, row.clientHeight)));
+  // 幅は枠から取る。行は中央寄せで中身の幅に縮むので、行を見ると盤が痩せ続ける
+  const side = Math.max(150, Math.floor(Math.min(frame.clientWidth - gutter, row.clientHeight)));
   const px = side + 'px';
   if (board.style.width === px) return;    // 同じ値で書き戻すと監視が回り続ける
   wrap.style.width = px;
@@ -898,11 +900,11 @@ function announce(id, detail) {
 
 
 /* ---------- 階の遷移。墨の帯が走り、階数が刻まれる ---------- */
-function floorTransition(floor, then) {
+function floorTransition(floor, then, label) {
   const el = $('transition');
   if (!el || motionCalm) { then(); return; }
   $('tr-num').textContent = String(floor).padStart(2, '0');
-  $('tr-label').textContent = 'floor';
+  $('tr-label').textContent = label || 'floor';
   el.classList.remove('hidden', 'run');
   void el.offsetWidth;
   el.classList.add('run');
@@ -1259,7 +1261,7 @@ function render() {
     $('score').textContent = run.score.toLocaleString('ja-JP');
     $('score').style.visibility = '';
   } else {
-    $('floor-label').textContent = `GAME ${match.game} / 2WINS`;
+    $('floor-label').textContent = `ROUND ${match.game}`;
     $('turn-label').textContent = pos.turn === SENTE
       ? `▲ ${match.s.name}`
       : `△ ${match.g.name}`;
@@ -1339,9 +1341,29 @@ function renderClock() {
 }
 
 /* 対戦では両者の能力を並べて出す。相手が何を積んでいるか常に見える */
+/* 2本先取を「残機」として見せる。相手にあと何回勝たれたら終わりか、
+   自分があと何回で勝つのかが、数字を読まなくても分かるようにする。 */
+function renderLives(bar) {
+  if (!match) return;
+  const me = myView(), foe = other(me);
+  const box = document.createElement('div');
+  box.className = 'vs-lives';
+  const side = (o, label) => {
+    const left = 2 - match.wins[other(o)];      // 相手の勝ち数だけ削られる
+    const pips = [0,1].map(i => `<i class="${i < left ? 'on' : 'lost'}"></i>`).join('');
+    return `<span class="vl ${o === me ? 'mine' : ''}">`
+         + `<b>${label}</b>${pips}</span>`;
+  };
+  const point = match.wins[me] === 1 || match.wins[foe] === 1;
+  box.innerHTML = side(me, '自') + `<span class="vl-round">ROUND ${match.game}</span>` + side(foe, '敵')
+    + (point ? `<span class="vl-point">${match.wins[me] === 1 ? 'あと1勝' : 'あと1敗で終わり'}</span>` : '');
+  bar.appendChild(box);
+}
+
 function renderVersusAbilities(bar) {
   bar.classList.remove('hidden');
   bar.classList.add('vs-abils');
+  renderLives(bar);
   const me = myView(), foe = other(me);
   for (const [side, label] of [[me, '自'], [foe, '敵']]) {
     const ids = Object.keys(sideAb[side]).filter(id => sideAb[side][id] > 0);
@@ -1714,6 +1736,15 @@ function finish(winner, how) {
   if (mode === 'versus') {
     if (how === 'king' && cheatDeath(other(winner))) return;
     sfx.clear();
+    // 残機が削られる側の、いちばん右の点を砕いてから数える
+    const loser = other(winner);
+    const pips = [...document.querySelectorAll('.vl')]
+      .find(e => e.querySelector('b').textContent === (loser === myView() ? '自' : '敵'));
+    if (pips && !motionCalm) {
+      const on = [...pips.querySelectorAll('i.on')];
+      const last = on[on.length - 1];
+      if (last) { last.classList.add('breaking'); shake(2); sfx.chainBreak(); }
+    }
     match.wins[winner]++;
     const w = match.wins;
     const score = `▲ ${w.s} — ${w.g} △`;
@@ -1729,7 +1760,7 @@ function finish(winner, how) {
       const title = mine === null ? `${mark} ${champ.name} の勝利`
                   : mine ? '勝　利' : '敗　北';
       const body = (mine === null ? '' : `${mark} ${champ.name} の勝ち\n`)
-                 + `${score}\n2本先取で決着。`;
+                 + `${score}\n2本先取。相手の残機を削り切った。`;
       showOverlay(title, body, [
         ['同じ組み合わせでもう一番', () => startMatch(match.s, match.g, match.cpu)],
         ['編成を選び直す', openSetup],
@@ -1737,12 +1768,20 @@ function finish(winner, how) {
       ], 'MATCH END', null, mine === null ? '' : (mine ? 'win' : 'lose'));
     } else {
       const won = seat === null ? null : winner === seat;
-      const head = won === null ? `第${match.game}局  ${winner === SENTE ? '▲' : '△'}の勝ち`
-                 : won ? `第${match.game}局  勝ち` : `第${match.game}局  負け`;
-      showOverlay(head, `${why}\n${score}\n先に2勝した方が勝ちです。`, [
-        ['次の局へ', () => { match.game++; startVersus(); }],
+      const head = won === null ? `ROUND ${match.game}  ${winner === SENTE ? '▲' : '△'}の勝ち`
+                 : won ? `ROUND ${match.game}  勝ち` : `ROUND ${match.game}  負け`;
+      // 残機で言い直す。次が最後の一戦なら、それをはっきり出す
+      const meSeat = seat === null ? SENTE : seat;
+      const myLeft = 2 - w[other(meSeat)], foeLeft = 2 - w[meSeat];
+      const lives = seat === null
+        ? `▲ のこり${2 - w.g}　△ のこり${2 - w.s}`
+        : `自分 のこり${myLeft}　相手 のこり${foeLeft}`;
+      const brink = (myLeft === 1 || foeLeft === 1)
+        ? `\n次で決まる。${myLeft === 1 ? '負ければ終わり。' : '勝てば決着。'}` : '';
+      showOverlay(head, `${why}\n${lives}${brink}`, [
+        ['次の勝負へ', () => { match.game++; floorTransition(match.game, startVersus, 'round'); }],
         ['タイトルへ', toTitle],
-      ], `GAME ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'));
+      ], `ROUND ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'));
     }
     return;
   }

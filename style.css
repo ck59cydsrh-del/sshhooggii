@@ -1111,3 +1111,25 @@ body.calm .pc.flyer{display:none}
   #deck .deck-sec{display:block}
   #deck-pieces,#deck-abilities{overflow:visible;mask-image:none;-webkit-mask-image:none}
 }
+
+/* 残機 — 2本先取を目で数えられるようにする */
+.vs-lives{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid var(--g12);padding-bottom:7px;margin-bottom:6px;width:100%}
+.vl{display:flex;align-items:center;gap:5px}
+.vl b{font-family:var(--mincho);font-size:11px;font-weight:400;letter-spacing:.14em;color:var(--g45)}
+.vl.mine b{color:var(--ink)}
+.vl i{width:9px;height:9px;display:inline-block;border:1px solid var(--ink)}
+.vl i.on{background:var(--ink)}
+.vl.mine i{border-color:var(--green)}
+.vl.mine i.on{background:var(--green)}
+.vl i.lost{background:transparent;border-style:dashed;opacity:.5}
+.vl-round{font-size:9.5px;letter-spacing:.2em;color:var(--g45);margin:0 auto}
+.vl-point{font-family:var(--mincho);font-size:10.5px;letter-spacing:.14em;
+  color:var(--ink);background:var(--glow);padding:2px 7px}
+/* 残機がひとつ砕けるとき */
+@keyframes lifeBreak{
+  0%{transform:scale(1);opacity:1}
+  30%{transform:scale(1.6) rotate(8deg);opacity:1}
+  100%{transform:scale(.7) rotate(-6deg);opacity:.5}
+}
+.vl i.breaking{animation:lifeBreak .5s var(--jelly) forwards}
