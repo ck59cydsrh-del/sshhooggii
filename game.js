@@ -1897,56 +1897,116 @@ function saveToSlot(i) {
   openPresets('saved', i);
 }
 
-function openPresets(m, savedIdx = -1) {
+let presetOpen = -1;            // いま中身を開いている枠
+
+/* 編成の中身。何を持ち帰ったのかは、ここで全部見せる */
+function presetBody(p) {
+  const value = HAND_ORDER.reduce((s, t) => s + VAL[t] * (p.pool[t] || 0), 0);
+  const chips = HAND_ORDER.filter(t => p.pool[t])
+    .map(t => `<span class="ap"><b>${NAME[t]}</b>${p.pool[t] > 1 ? `<i>${p.pool[t]}</i>` : ''}</span>`).join('');
+
+  const ids = Object.keys(p.abilities || {});
+  const rows = ids
+    .sort((a, b) => (ABI_BY_ID[b].r - ABI_BY_ID[a].r) || a.localeCompare(b))
+    .map(id => {
+      const a = ABI_BY_ID[id];
+      if (!a) return '';
+      const n = p.abilities[id];
+      const vs = VS_OK.has(id);
+      return `<div class="pb-ab r${a.r}${vs ? '' : ' solo-only'}">
+        <span class="pb-r">${RARITY[a.r]}</span>
+        <span class="pb-n"><b>${a.n}</b>${n > 1 ? `<i>×${n}</i>` : ''}
+          <span class="pb-y">${yomi(id)}</span></span>
+        <span class="pb-tag">${vs ? catOf(id) : '潜行のみ'}</span>
+        <span class="pb-d">${a.d}${DIAG_PIECE[id] ? diagramSVG(id) : ''}</span>
+      </div>`;
+    }).join('');
+
+  const usable = ids.filter(id => VS_OK.has(id)).length;
+  return `<div class="preset-body">
+    <p class="pb-head"><span>駒</span><b>${poolTotal(p.pool)}枚 / 価値 ${value.toLocaleString('ja-JP')}</b></p>
+    <div class="pb-pieces">${chips}</div>
+    <p class="pb-head"><span>能力</span><b>${ids.length}個${
+      usable < ids.length ? ` / 対戦で使えるのは ${usable}個` : ''}</b></p>
+    <div class="pb-abils">${rows || '<span class="ap-none">能力なし</span>'}</div>
+    <p class="pb-note">対戦に持ち込むときは、この中から<b>駒10枚</b>と、
+      <b>能力は予算10・枠5まで</b>を選びます。持ち帰った能力の値は 並1 / 希2 / 極5。</p>
+  </div>`;
+}
+
+function openPresets(m, savedIdx = -1, keepOpen = false) {
   presetMode = m;
   pendingSlot = -1; abandonArmed = false;
   ['title','game','setup','deck'].forEach(id => $(id).classList.add('hidden'));
   $('presets').classList.remove('hidden');
+  const data = loadPresets();
+  const have = data.filter(Boolean).length;
+
   $('presets-tag').innerHTML =
     (m === 'save' ? 'RETREAT / SAVE' : m === 'saved' ? 'SAVED' : 'UNITS');
   $('presets-title').textContent =
     m === 'save' ? '編成を保存' : m === 'saved' ? '保存しました' : '保存した編成';
   $('presets-hint').textContent =
     m === 'save'  ? '枠を選ぶと、いまの持ち駒と能力ごと保存してランを終えます。'
-  : m === 'saved' ? `枠${savedIdx+1}に保存しました。対戦で選べます。`
-  :                 '対戦で選べます。';
+  : m === 'saved' ? `枠${savedIdx+1}に保存しました。このまま対戦に持ち込めます。`
+  : have          ? '押すと中身が開きます。選んだ編成でそのまま対戦へ。'
+  :                 'まだ何もありません。潜って撤退すると、そのときの駒と能力ごと残せます。';
   $('btn-presets-back').querySelector('b').textContent =
     m === 'save' ? '保存せずに終える' : '戻る';
 
-  // 保存した直後は、そのまま対戦へ入れるようにする(ここが本筋の合流点)
-  const saved = loadPresets();
-  const go = savedIdx >= 0 ? savedIdx : saved.findIndex(Boolean);
-  const btn = $('btn-presets-versus');
-  btn.classList.toggle('hidden', m === 'save' || go < 0 || !saved[go]);
-  if (saved[go]) {
-    $('pv-sub').textContent = `${saved[go].name} — 能力が安く積めます`;
-    btn.onclick = () => { sfx.ui(); openSetup('s' + go); };
+  // 開く枠。保存直後はその枠、ふだんは最初の1件。
+  // 開け閉めの再描画では、いま開いている枠をそのまま引き継ぐ
+  if (!keepOpen) {
+    presetOpen = m === 'save' ? -1
+      : savedIdx >= 0 ? savedIdx
+      : data.findIndex(Boolean);
   }
 
   const list = $('preset-list');
-  const data = loadPresets();
   list.innerHTML = '';
   for (let i = 0; i < SLOTS; i++) {
     const p = data[i];
+    const wrap = document.createElement('div');
+    wrap.className = 'preset-row' + (p && i === presetOpen ? ' open' : '');
+
     const row = document.createElement('button');
     row.className = 'preset' + (p ? '' : ' empty') + (i === savedIdx ? ' just-saved' : '');
-    const body = p
+    row.innerHTML = `<span class="pslot">${String(i+1).padStart(2,'0')}</span>` + (p
       ? `<span class="pmain"><b>${p.name}</b>
-         <span class="ppool">${poolText(p.pool)}</span>
-         <span class="pab">能力 ${Object.values(p.abilities||{}).reduce((a,b)=>a+b,0)}個 / スコア ${(p.score||0).toLocaleString('ja-JP')}</span></span>`
-      : `<span class="pmain"><b>空き枠</b></span>`;
-    row.innerHTML = `<span class="pslot">${String(i+1).padStart(2,'0')}</span>${body}`;
-    if (presetMode === 'save') {
+           <span class="pmeta">${p.floor || '?'}階到達 / ${(p.score||0).toLocaleString('ja-JP')}点 / 駒${poolTotal(p.pool)}枚 / 能力${Object.keys(p.abilities||{}).length}個</span></span>
+         <span class="pmore">${m === 'save' ? '' : (i === presetOpen ? 'とじる' : '中身')}</span>`
+      : `<span class="pmain"><b>空き枠</b><span class="pmeta">${
+          m === 'save' ? 'ここに保存する' : '潜って撤退すると、ここに残せます'}</span></span>`);
+
+    if (m === 'save') {
       row.addEventListener('click', () => {
-        if (!p) return saveToSlot(i);
-        if (pendingSlot === i) return saveToSlot(i);
+        if (!p || pendingSlot === i) return saveToSlot(i);
         pendingSlot = i;
-        [...list.children].forEach(c => c.classList.remove('confirm'));
+        [...list.querySelectorAll('.preset')].forEach(c => c.classList.remove('confirm'));
         row.classList.add('confirm');
         row.querySelector('.pmain b').textContent = 'もう一度押すと上書き';
       });
+    } else if (p) {
+      row.addEventListener('click', () => {           // 開いた枠が、そのまま対戦に持ち込む枠になる
+        sfx.ui();
+        presetOpen = (presetOpen === i) ? -1 : i;
+        openPresets(presetMode, savedIdx, true);
+      });
     }
-    list.appendChild(row);
+    wrap.appendChild(row);
+    if (p && i === presetOpen && m !== 'save') {
+      wrap.insertAdjacentHTML('beforeend', presetBody(p));
+    }
+    list.appendChild(wrap);
+  }
+
+  // 開いている編成をそのまま対戦へ(ここが本筋の合流点)
+  const go = presetOpen >= 0 && data[presetOpen] ? presetOpen : -1;
+  const btn = $('btn-presets-versus');
+  btn.classList.toggle('hidden', m === 'save' || go < 0);
+  if (go >= 0) {
+    $('pv-sub').textContent = `${data[go].name} — 能力が安く積めます`;
+    btn.onclick = () => { sfx.ui(); openSetup('s' + go); };
   }
 }
 
@@ -2293,9 +2353,12 @@ function showNote(selId, noteId) {
   const abNames = Object.keys(src.abilities || {})
     .filter(id => VS_OK.has(id))
     .map(id => ABI_BY_ID[id].n);
+  // 持ち帰った能力のうち、対戦の盤に対応物が無いものは黙って消さずに数を言う
+  const soloOnly = Object.keys(src.abilities || {}).filter(id => !VS_OK.has(id)).length;
   $(noteId).innerHTML = src.editable
     ? '駒を10枚に絞り、<b>修得ずみの能力だけ</b>を選びます。'
       + '既定編成より安く積めます(並1 / 希2 / 極5)。'
+      + (soloOnly ? `<span class="note-ab">手数・得点まわりの${soloOnly}個は対戦の盤に出番がないので候補に出ません</span>` : '')
     : '駒は固定。能力は全種から選べますが値は張ります(並2 / 希4 / 極10)。'
       + (abNames.length ? `<span class="note-ab">初期の能力 ${abNames.join(' / ')}</span>` : '');
 }
