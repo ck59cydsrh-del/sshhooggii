@@ -689,6 +689,11 @@ const BUF = {};
 const SFX_FILES = {
   move:'sfx/move.wav', ui:'sfx/ui.wav', drop:'sfx/drop.wav', hit:'sfx/hit.wav',
   power:'sfx/power.wav', alarm:'sfx/alarm.wav', heavy:'sfx/heavy.wav', clear:'sfx/clear.wav',
+  // 追加分。実測(長さ・ピーク・ゼロ交差率)で用途を決めてある
+  impact:'sfx/impact.wav',    // 0.33s ピーク0.94 低め — 鋭い一撃
+  crumble:'sfx/crumble.wav',  // 0.87s 高域のノイズが尾を引く — 崩れる
+  spark:'sfx/spark.wav',      // 0.46s 控えめ — 淡い合図
+  thud:'sfx/thud.wav',        // 0.50s 最も低い — 落ちる
 };
 function ac() {
   if (!actx) {
@@ -763,11 +768,12 @@ const sfx = {
   pick:  r => play('power', r === 3 ? 0.8 : r === 2 ? 1.0 : 1.2, 0.9),
   dead:  () => play('clear', 0.62, 1),
   revive:() => play('heavy', 1.35, 0.9),
-  // 極が出た瞬間は、重い一撃と高い煌めきを重ねる(並と同じ音では当たりが立たない)
-  jackpot:() => { play('heavy', 0.72, 1); setTimeout(() => play('power', 1.5, 0.8), 60);
-                  setTimeout(() => play('power', 2.0, 0.5), 150); },
-  chainBreak:() => play('hit', 0.55, 0.5),        // 連鎖が切れた
-  collapse:() => play('heavy', 0.6, 0.55),        // 崩壊の足音
+  // 極が出た瞬間は一撃を据えて、高い煌めきを後ろに重ねる
+  jackpot:() => { play('impact', 1, 1); setTimeout(() => play('power', 1.8, 0.55), 90); },
+  chainBreak:() => play('thud', 1, 0.7),          // 連鎖が切れた
+  collapse:() => play('crumble', 1, 0.7),         // 崩壊の足音
+  ability:r => play('spark', r === 3 ? 0.86 : r === 2 ? 1 : 1.14, r === 3 ? 1 : 0.8),
+  big:   () => play('impact', 0.9, 0.9),          // 大駒を取った
 };
 
 function shake(power = 1) {
@@ -814,9 +820,8 @@ function fitBoard() {
   const row = wrap.parentElement;                      // 盤と段のラベルが並ぶ行
   const ranks = row && row.querySelector('.ranks');
   if (!row || !row.clientHeight) return;
-  const side = Math.max(150, Math.floor(Math.min(
-    row.clientWidth - (ranks ? ranks.offsetWidth + 9 : 0),   // 9px は行の隙間
-    row.clientHeight)));
+  const gutter = ranks ? (ranks.offsetWidth + 9) * 2 : 0;   // 左右に同じ逃げを取る
+  const side = Math.max(150, Math.floor(Math.min(row.clientWidth - gutter, row.clientHeight)));
   const px = side + 'px';
   if (board.style.width === px) return;    // 同じ値で書き戻すと監視が回り続ける
   wrap.style.width = px;
@@ -877,7 +882,8 @@ function announce(id, detail) {
     + `<span>${detail || a.d}</span>`;
   box.appendChild(el);
   shake(a.r === 3 ? 2 : a.r === 2 ? 1.3 : 0.8);
-  sfx.power(a.r);
+  sfx.ability(a.r);
+  if (a.r === 3) setTimeout(() => sfx.power(3), 70);
   flashScreen(a.r === 3 ? 'hard' : '');
   ringBurst(a.r);
   setTimeout(() => el.classList.add('out'), a.r === 3 ? 1500 : 1200);
@@ -1426,6 +1432,7 @@ function applyMove(mv, fromNet) {
     if (mode === 'versus') captureBanner(mover, captured);
     pendingFly = { idx: mv.to, t: captured.t, o: mover };
     burst(mv.to); shake(captured.t === 'R' || captured.t === 'B' ? 1.6 : 1);
+    if (captured.t === 'R' || captured.t === 'B') sfx.big();
     if (ab(mover,'duplicate')) { msg += ' 複製!'; announce('duplicate', `${NAME[captured.t]}が2枚になった`); }
     if (ab(mover,'promoteChain') && promoteOne(mover)) { msg += ' 昇格伝染!'; announce('promoteChain'); }
     if (mover === SENTE && ab(SENTE,'avalanche')) {
