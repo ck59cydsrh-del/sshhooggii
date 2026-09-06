@@ -2998,10 +2998,11 @@ function showMatchup(a, b, then) {
   // 入りのあいだ BGM は退かせる。音は FIGHT の瞬間に置く
   hushBgm(true);
   let fightSfx = null;
-  setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);
+  // 音は「対」の叩きつけから。頭の一撃がそこに合い、終いの盛り上がりが
+  // FIGHT から墨に落ちるところへ乗る
+  setTimeout(() => { fightSfx = sfx.fight(); if (!motionCalm) shake(2.6); }, 620);
   setTimeout(() => {
     box.classList.add('go');
-    fightSfx = sfx.fight();                      // FIGHT と同時に打つ
     if (motionCalm) return;
     shake(1.8);
     // 「対」が退いたあとに、開戦を叩き込む
