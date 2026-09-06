@@ -2995,12 +2995,10 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 入りのあいだ BGM は退かせる。音は FIGHT の瞬間に置く
+  // 入りのあいだ BGM は退かせる。音は演出の頭から流す
   hushBgm(true);
-  let fightSfx = null;
-  // 音は「対」の叩きつけから。頭の一撃がそこに合い、終いの盛り上がりが
-  // FIGHT から墨に落ちるところへ乗る
-  setTimeout(() => { fightSfx = sfx.fight(); if (!motionCalm) shake(2.6); }, 620);
+  let fightSfx = sfx.fight();
+  setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);   // 「対」の叩きつけ
   setTimeout(() => {
     box.classList.add('go');
     if (motionCalm) return;
