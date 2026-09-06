@@ -67,10 +67,10 @@ const ABILITIES = [
   { id:'silverWide', n:'銀嶺',      r:1, d:'自分の銀は横にも動ける' },
   { id:'silverBack', n:'銀の帰還',  r:1, d:'自分の銀は真後ろにも動ける' },
   { id:'knightBack', n:'逆跳ね',    r:1, d:'自分の桂は後ろにも跳べる' },
-  { id:'knightFar',  n:'大跳ね',    r:2, d:'自分の桂は前2横2にも跳べる' },
+  { id:'knightFar',  n:'大跳ね',    r:1, d:'自分の桂は前2横2にも跳べる' },
   { id:'lanceBack',  n:'双香',      r:1, d:'自分の香は後ろにも走れる' },
-  { id:'kingRun',    n:'韋駄天玉',  r:1, d:'自分の玉は縦横に2マス動ける' },
-  { id:'pawnDiag',   n:'歩兵突撃',  r:1, d:'自分の歩は斜め前にも進める' },
+  { id:'kingRun',    n:'韋駄天玉',  r:2, d:'自分の玉は縦横に2マス動ける' },
+  { id:'pawnDiag',   n:'歩兵突撃',  r:2, d:'自分の歩は斜め前にも進める' },
   { id:'tokinPlus',  n:'と金無双',  r:2, d:'成った小駒は斜め後ろにも動ける' },
 
   // --- 成り ---
@@ -82,8 +82,8 @@ const ABILITIES = [
   { id:'nifuOk',      n:'二歩御免',  r:1, d:'同じ筋に歩を何枚でも打てる' },
   { id:'dropAny',     n:'天井打ち',  r:2, d:'動けなくなるマスにも打てる。その駒は成って出る' },
   { id:'dropStrike',  n:'強襲打ち',  r:2, d:'駒を打つ手は手数を消費しない' },
-  { id:'noEnemyDrop', n:'封鎖',      r:2, d:'敵は持ち駒を打てなくなる' },
-  { id:'fortress',    n:'堅陣',      r:1, d:'玉の隣接8マスに敵の駒は現れない(打ち込みも増援も)' },
+  { id:'noEnemyDrop', n:'封鎖',      r:3, d:'敵は持ち駒を打てなくなる' },
+  { id:'fortress',    n:'堅陣',      r:3, d:'玉の隣接8マスに敵の駒は現れない(打ち込みも増援も)' },
 
   // --- 手番 ---
   { id:'extraTurn',  n:'連撃',   r:2, d:'駒を取ると、続けてもう一手(階1回)' },
@@ -218,7 +218,7 @@ const versusOnly = abils => {
    1手の価値が固定の対人戦では、手番が2回来る効果は釣り合いを壊す。 */
 
 /* デッキ構築: 並2 / 希4 / 極10、予算10、枠5。修得済みは1安い */
-/* 既定編成 = 25種すべてから選べるが高い。
+/* 既定編成 = 対戦で使える全種から選べるが高い。
    潜って持ち帰った編成 = 修得したものだけだが、ひとつずつが大幅に安い。
    「広さ」と「深さ」の取引にしてある。 */
 const AB_COST      = { 1:2, 2:4, 3:10 };   // 既定編成
@@ -2612,15 +2612,15 @@ $('btn-presets-back').addEventListener('click', () => {
 /* 既定編成。駒はどれも10枚、能力は予算10ぶん(修得割引なし)で組んである */
 const BUILTIN = [
   { id:'b0', name:'均衡',   note:'素直に強い。迷ったらこれ',
-    pool:{ G:1, S:2, N:1, L:1, P:5 }, abilities:{ silverWide:1, nifuOk:1, kingRun:1, pawnDiag:1, silverBack:1 } },
+    pool:{ G:1, S:2, N:1, L:1, P:5 }, abilities:{ silverWide:1, nifuOk:1, kingRun:1, silverBack:1 } },
   { id:'b1', name:'急襲隊', note:'数で押す。歩が2マス進み、桂が前後に跳ぶ',
-    pool:{ S:1, N:2, L:2, P:5 }, abilities:{ pawnRun:1, knightBack:1, knightFar:1 } },
+    pool:{ S:1, N:2, L:2, P:5 }, abilities:{ pawnRun:1, knightBack:1, knightFar:1, lanceBack:1 } },
   { id:'b2', name:'重装',   note:'大駒中心。一撃が重く、金が玉の動きをする',
-    pool:{ R:1, B:1, G:1, P:7 }, abilities:{ goldKing:1, zone2:1, kingRun:1 } },
+    pool:{ R:1, B:1, G:1, P:7 }, abilities:{ goldKing:1, zone2:1, nifuOk:1 } },
   { id:'b3', name:'搦手',   note:'二歩御免と歩兵突撃で歩が牙を剥く',
-    pool:{ S:1, N:2, L:2, P:5 }, abilities:{ nifuOk:1, pawnDiag:1, promoteChain:1, silverBack:1 } },
-  { id:'b4', name:'城塞',   note:'玉の周りに敵を寄せつけず、粘り強い',
-    pool:{ G:2, S:2, P:6 }, abilities:{ fortress:1, silverWide:1, recycle:1, lanceBack:1 } },
+    pool:{ S:1, N:2, L:2, P:5 }, abilities:{ nifuOk:1, pawnDiag:1, knightBack:1, silverBack:1 } },
+  { id:'b4', name:'城塞',   note:'堅陣ひとつに予算を全部賭ける。玉の周り8マスに敵は入れない',
+    pool:{ G:2, S:2, P:6 }, abilities:{ fortress:1 } },
 ];
 for (const b of BUILTIN) {
   for (const id of Object.keys(b.abilities)) if (!VS_OK.has(id)) delete b.abilities[id];
