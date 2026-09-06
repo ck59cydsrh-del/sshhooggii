@@ -316,6 +316,10 @@ function stuckAt(t, o, row) {
 }
 function canPromote(p, from, to) {
   if (p.pr || p.t === 'K' || p.t === 'G') return false;
+  // 本将棋では「行き所がなくなる段」は必ず成り域の内側なので、成れずに詰まることはない。
+  // 5段の盤に縮めて成り域を最奥1段にしたせいで、4段目の桂だけがその関係から外れ、
+  // 跳べば行き所がないのに成れない=前に跳べない、という歪みが出ていた。関係を回復する。
+  if (stuckAt(p.t, p.o, rowOf(to))) return true;
   return inZone(rowOf(from), p.o) || inZone(rowOf(to), p.o);
 }
 function mustPromote(p, to) {
@@ -783,6 +787,30 @@ function burst(idx) {
 }
 let pendingFly = null;      // 取った駒を、描き直したあとで駒台へ飛ばす
 /* 描き直してから、取った駒を駒台へ飛ばす。突破や詰みで抜けるときも通る */
+/* 盤の一辺は「残った高さ」と「使える幅」の狭いほうに合わせる。
+   CSSだけだと筋のラベルが盤とずれるので、両方に同じ値を入れる。 */
+function fitBoard() {
+  const wrap = $('board-wrap'), board = $('board'), files = $('files');
+  if (!wrap || !board) return;
+  const row = wrap.parentElement;                      // 盤と段のラベルが並ぶ行
+  const ranks = row && row.querySelector('.ranks');
+  if (!row || !row.clientHeight) return;
+  const side = Math.max(150, Math.floor(Math.min(
+    row.clientWidth - (ranks ? ranks.offsetWidth + 9 : 0),   // 9px は行の隙間
+    row.clientHeight)));
+  const px = side + 'px';
+  if (board.style.width === px) return;    // 同じ値で書き戻すと監視が回り続ける
+  wrap.style.width = px;
+  board.style.width = px;
+  if (files) files.style.width = px;
+}
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => fitBoard());
+  addEventListener('DOMContentLoaded', () => { const w = $('board-wrap'); if (w) ro.observe(w); });
+  if (document.readyState !== 'loading') { const w = $('board-wrap'); if (w) ro.observe(w); }
+}
+addEventListener('resize', fitBoard);
+
 function repaint() {
   render();
   if (pendingFly) { flyToHand(pendingFly.idx, pendingFly.t, pendingFly.o); pendingFly = null; }
@@ -1153,6 +1181,7 @@ function render() {
   document.querySelector('.tray-self .tray-label').textContent = '自';
   document.querySelector('.tray-enemy .tray-label').textContent = '敵';
   renderAbilityBar(); renderCharges(); renderClock();
+  fitBoard();
 
   if (mode === 'solo') {
     $('floor-label').textContent = 'FLOOR ' + String(run.floor).padStart(2, '0');

@@ -104,6 +104,8 @@ body{
 .screen:has(> .screen-body){display:flex;flex-direction:column;max-height:100%}
 .screen-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
+  /* スクロール領域の右端に逃げを作る。図やコストが縁に貼り付いて窮屈だった */
+  padding-right:10px;
   /* 続きがあることを、下端の細い翳りで示す */
   mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);
   -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}
@@ -415,9 +417,11 @@ body.calm .preset-body{animation:none}
 .hud-floor{display:flex;align-items:center;gap:11px}
 .sigil{width:20px;height:20px;image-rendering:pixelated;display:block;opacity:.8}
 .hud-floor-text{display:flex;flex-direction:column;gap:5px}
-#floor-label{font-size:11px;letter-spacing:.24em;color:var(--ink)}
+#floor-label{font-size:11px;letter-spacing:.24em;color:var(--ink);white-space:nowrap}
 #turn-label{font-size:9.5px;letter-spacing:.22em;color:var(--g70)}
 .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+/* ボタンを縦に積むとHUDだけで163pxを使い、盤が小さくなっていた */
+.hud-btns{display:flex;align-items:center;gap:4px}
 .score{
   font-family:var(--sans);font-size:17px;font-weight:400;letter-spacing:.06em;
   color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;
@@ -480,6 +484,34 @@ body.calm .preset-body{animation:none}
 .files span{text-align:center}
 .ranks{grid-template-rows:repeat(5,1fr);width:10px;align-items:center}
 .ranks span{text-align:center}
+
+/* 盤の画面は流さない。能力や持ち駒が増えても、盤と駒台と手控えが
+   常に見えているようにする(深い階では能力が3行・持ち駒が2行に折り返して
+   下のログが画面の外へ押し出されていた)。 */
+#game{display:flex;flex-direction:column;height:100%;min-height:0}
+#game>*{flex:none}                      /* 縦に潰れると字が切れる */
+/* 盤の枠だけが残りの高さを引き受ける */
+#game>.board-frame{flex:1 1 0;min-height:0}
+#game .board-row{flex:1 1 0;min-height:0}
+#game #board-wrap{min-height:0;flex:0 0 auto;display:flex;align-items:center;justify-content:flex-start}
+/* 盤の一辺は fitBoard() が測って入れる。筋のラベルも同じ幅に合わせる */
+#game #board{width:100%;height:auto;aspect-ratio:1/1;margin:0}
+/* 能力と持ち駒は行を増やさず、横に流す。子は縮ませない(潰れて字が切れる) */
+.ability-bar{flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;align-items:center;
+  scrollbar-width:none;-ms-overflow-style:none}
+.ability-bar>*{flex:none}
+.ability-bar .vs-row>*{flex:none}
+.tray-row>*{flex:none}
+.ability-bar::-webkit-scrollbar{display:none}
+.ability-bar.vs-abils{flex-wrap:nowrap}
+/* 縦積みの行は、中身が長くても親の幅を超えさせない(超えると画面の縁に食い込む) */
+.ability-bar.vs-abils .vs-row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+  width:100%;min-width:0}
+.ability-bar.vs-abils .vs-row::-webkit-scrollbar{display:none}
+.tray-row{flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;
+  scrollbar-width:none;-ms-overflow-style:none}
+.tray-row::-webkit-scrollbar{display:none}
+#log{flex:none}
 
 #board-wrap{position:relative;flex:1}
 
