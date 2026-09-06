@@ -195,15 +195,25 @@ const yomi = id => YOMI[id] || '';
 
 /* 対戦で実際に働く能力だけ。手数・スコア・階の収入・地形・狩りは
    対戦盤には存在しないので、選べても無意味になる。 */
+// 対戦で使える能力。ここから外したものが2つある。
+//   封鎖  … 相手は持ち駒10枚を1枚も打てなくなる。400局まわして勝率97.8%
+//            (能力なし同士は50.7%)。入れたかどうかだけの勝負になっていた
+//   先遣隊… 持ち駒1枚を先に盤へ出す=1手の節約。潜るときは手数が有限だから
+//            効くが、対戦は手数無制限なので節約する先がない。勝率48.5%
 const VS_OK = new Set([
   'pawnRun','rookDragon','bishopHorse','goldKing','silverWide','silverBack',
   'knightBack','knightFar','lanceBack','kingRun','pawnDiag','tokinPlus',
   'zone2','dropPromoted','promoteChain',
-  'nifuOk','dropAny','noEnemyDrop','fortress',
-  'duplicate','recycle','vanguard',
+  'nifuOk','dropAny','fortress',
+  'duplicate','recycle',
   'revive','revive2','sacrifice',
 ]);
 const VS_ABILITIES = ABILITIES.filter(a => VS_OK.has(a.id));
+const versusOnly = abils => {
+  const o = {};
+  for (const id in (abils || {})) if (VS_OK.has(id)) o[id] = abils[id];
+  return o;
+};
 /* 対戦では追加手番(連撃・連撃改・先制)を禁止する。kozakiの指定。
    1手の価値が固定の対人戦では、手番が2回来る効果は釣り合いを壊す。 */
 
@@ -663,7 +673,9 @@ function startVersus() {
   mode = 'versus';
   run = null;
   goteIsCPU = match.cpu;
-  sideAb = { s: match.s.abilities || {}, g: match.g.abilities || {} };
+  // VS_OK は編成画面の見た目だけでなく、ここで実際に濾す。潜って持ち帰った
+  // 編成は潜行専用の能力を抱えたまま対戦に来るので、入口で落とさないと効く
+  sideAb = { s: versusOnly(match.s.abilities), g: versusOnly(match.g.abilities) };
   pos = newPos(new Set());
   pos.b[22] = { t:'K', o:SENTE, pr:false };
   pos.b[2]  = { t:'K', o:GOTE,  pr:false };
