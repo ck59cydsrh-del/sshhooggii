@@ -588,7 +588,7 @@ let gen = 0;
 /* ---------- ラン ---------- */
 function startRun() {
   mode = 'solo';
-  run = { floor:1, pool:{ G:1, P:1 }, abilities:{}, score:0, reviveLeft:0, comboBest:0, taken:0 };
+  run = { floor:1, pool:{ G:1, P:1 }, abilities:{}, score:0, reviveLeft:0, comboBest:0, taken:0, bestHit:0 };
   scoreShown = 0; $('score').textContent = '0';
   sideAb = { s:run.abilities, g:{} };
   startFloor();
@@ -1614,7 +1614,10 @@ function applyMove(mv, fromNet) {
       floorState.bestChain = Math.max(floorState.bestChain || 0, floorState.combo);
       showJudge(floorState.combo, big > 1 || captured.t === 'R' || captured.t === 'B');
       setFever(floorState.combo >= 5);
-      if (run) run.comboBest = Math.max(run.comboBest, floorState.combo);
+      if (run) {
+        run.comboBest = Math.max(run.comboBest, floorState.combo);
+        run.bestHit = Math.max(run.bestHit || 0, gained);   // この潜行いちばんの一撃
+      }
       if (ab(SENTE,'killClock')) { floorState.movesLeft++; announce('killClock', `手数 +1(残り${floorState.movesLeft})`); }
       checkMilestones();
       if (floorState.combo === 3 || floorState.combo === 5 || floorState.combo === 8 || floorState.combo >= 12)
@@ -1900,6 +1903,13 @@ function finish(winner, how) {
   }
 
   // --- 突破 ---
+  // 盤に残った敵の駒が、まとめて手元へ流れ込むのを見せる
+  if (!motionCalm) {
+    const left = [];
+    for (let i = 0; i < NS; i++) { const q = pos.b[i]; if (q && q.o === GOTE) left.push([i, q.t]); }
+    left.forEach(([i, t], k) => setTimeout(() => flyToHand(i, t, SENTE), 90 + k * 70));
+    if (left.length) setTimeout(() => { shake(1.6); sfx.power(2); }, 120);
+  }
   const pool = {};
   for (const t in pos.h.s) if (t !== 'K' && pos.h.s[t]) pool[t] = (pool[t]||0) + pos.h.s[t];
   for (let i = 0; i < NS; i++) {
@@ -2041,6 +2051,7 @@ function runOver() {
   showOverlay('討ち死に',
     `到達 ${reached}階   最高連鎖 ×${run.comboBest}\n`
     + `奪った駒 ${run.taken || 0}枚   修得した能力 ${abN}個\n`
+    + (run.bestHit ? `いちばんの一撃 ${Math.round(run.bestHit).toLocaleString('ja-JP')}点\n` : '')
     + `スコア ${run.score.toLocaleString('ja-JP')}`
     + (isNewScore ? '   自己新!' : `\n最高 ${bestScore.toLocaleString('ja-JP')}`)
     + '\n持ち駒はすべて失われた。', [
@@ -2999,13 +3010,14 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 頭から入りの音。BGMは止めておく(合図のあと頭から掛け直す)
+  // 頭から入りの音。FIGHT で断ち、合図のあとに BGM を頭から掛け直す
   hushBgm(false);
   stopBgm();
   let fightSfx = sfx.fight();
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);   // 「対」の叩きつけ
   setTimeout(() => {
     box.classList.add('go');
+    cutSfx(fightSfx, 140); fightSfx = null;      // FIGHT では入りの音を残さない
     if (motionCalm) return;
     shake(1.8);
     // 「対」が退いたあとに、開戦を叩き込む
