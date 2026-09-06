@@ -698,6 +698,8 @@ const SFX_FILES = {
   move:'sfx/move.wav', ui:'sfx/ui.wav', drop:'sfx/drop.wav', hit:'sfx/hit.wav',
   power:'sfx/power.wav', alarm:'sfx/alarm.wav', heavy:'sfx/heavy.wav', clear:'sfx/clear.wav',
   // 追加分。実測(長さ・ピーク・ゼロ交差率)で用途を決めてある
+  fight:'sfx/fight.wav',      // 2.64s 頭に一撃 → 間 → 終いにもう一度立つ — 対戦の入り
+  decide:'sfx/decide.wav',    // 3.38s 前半に9割 — 決着の一撃と余韻
   impact:'sfx/impact.wav',    // 0.33s ピーク0.94 低め — 鋭い一撃
   crumble:'sfx/crumble.wav',  // 0.87s 高域のノイズが尾を引く — 崩れる
   spark:'sfx/spark.wav',      // 0.46s 控えめ — 淡い合図
@@ -782,6 +784,8 @@ const sfx = {
   collapse:() => play('crumble', 1, 0.7),         // 崩壊の足音
   ability:r => play('spark', r === 3 ? 0.86 : r === 2 ? 1 : 1.14, r === 3 ? 1 : 0.8),
   big:   () => play('impact', 0.9, 0.9),          // 大駒を取った
+  fight: () => play('fight', 1, 1),               // 対戦の入り(尺2.6秒。演出に重ねる)
+  decide:() => play('decide', 1, 1),              // 決着
 };
 
 function shake(power = 1) {
@@ -1804,7 +1808,9 @@ function finish(winner, how) {
 
   if (mode === 'versus') {
     if (how === 'king' && cheatDeath(other(winner))) return;
-    sfx.clear();
+    // 勝負がつく局は決着の音、途中の局は区切りの音
+    const w0 = match.wins;
+    (w0[winner] + 1 >= 2) ? sfx.decide() : sfx.clear();
     // 残機が削られる側の、いちばん右の点を砕いてから数える
     const loser = other(winner);
     const pips = [...document.querySelectorAll('.vl')]
@@ -1812,7 +1818,9 @@ function finish(winner, how) {
     if (pips && !motionCalm) {
       const on = [...pips.querySelectorAll('i.on')];
       const last = on[on.length - 1];
-      if (last) { last.classList.add('breaking'); shake(2); sfx.chainBreak(); }
+      // 決着する局は決着の音に譲る(3秒の余韻に重ねると濁る)
+      if (last) { last.classList.add('breaking'); shake(2);
+        if (w0[winner] + 1 < 2) sfx.chainBreak(); }
     }
     match.wins[winner]++;
     const w = match.wins;
@@ -2213,8 +2221,7 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '
       setTimeout(() => r.remove(), 1100 + i * 130);
     }
     shake(2.6);
-    setTimeout(() => { sfx.jackpot(); shake(1.8); }, 260);
-    setTimeout(() => sfx.power(3), 520);
+    setTimeout(() => shake(1.8), 300);
   }
   const rk = $('overlay-rank');
   if (rank) {
@@ -2960,13 +2967,14 @@ function showMatchup(a, b, then) {
     };
     requestAnimationFrame(tick);
   });
-  // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる
-  sfx.ui();
-  setTimeout(() => { if (!motionCalm) { sfx.big(); shake(2.6); } }, 620);
+  // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
+  // 入りの音は尺2.6秒あるので頭から流し、演出に重ねる
+  sfx.fight();
+  setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);
   setTimeout(() => {
     box.classList.add('go');
     if (motionCalm) return;
-    sfx.jackpot(); shake(1.8);
+    shake(1.8);
     // 「対」が退いたあとに、開戦を叩き込む
     const kick = document.createElement('div');
     kick.className = 'mu-kick';
