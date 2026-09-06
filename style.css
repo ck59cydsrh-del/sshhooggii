@@ -580,6 +580,9 @@ body.flipped .pc.gote{transform:none}
 body.flipped .pc:not(.gote){transform:rotate(180deg)}
 .pc.gote polygon{fill:var(--ink)}
 .pc.gote text{fill:var(--paper)}
+/* 能力で動きが変わっている駒の印。右肩の小さな三角 */
+.pc-boost{fill:var(--glow);stroke:var(--ink);stroke-width:2;stroke-linejoin:miter}
+.pc.gote .pc-boost{fill:var(--glow);stroke:var(--paper)}
 .pc.pr polygon{stroke:var(--green)}
 .pc.pr text{fill:var(--green)}
 .pc.gote.pr polygon{fill:var(--green);stroke:var(--green)}
@@ -787,6 +790,11 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
   scrollbar-width:none}
 .overlay-card::-webkit-scrollbar,.draft-card::-webkit-scrollbar{display:none}
 .overlay-card{width:100%;max-width:290px}
+/* 勝ち負けは字だけでなく、面の出かたでも分かるようにする */
+.overlay.win #overlay-title{color:var(--green)}
+.overlay.win .overlay-card{border-top:3px solid var(--green);padding-top:18px}
+.overlay.lose .overlay-card{border-top:3px solid var(--ink);padding-top:18px}
+.overlay.lose #overlay-title{color:var(--g70)}
 #overlay-title{font-family:var(--didone);font-size:28px;letter-spacing:.16em;
   margin-bottom:18px;line-height:1.35;font-weight:400}
 #overlay-body{font-size:10.5px;line-height:2.15;color:var(--g70);margin-bottom:26px;

@@ -1115,10 +1115,24 @@ function addScore(n) {
    ============================================================ */
 const SVGNS = 'http://www.w3.org/2000/svg';
 const PENTA = '50,3 84,20 95,106 5,106 16,20';
+/* 能力で動きが変わっている駒。盤を見ただけでは分からなかったので印を付ける。
+   DIAG_PIECE は「どの能力がどの駒の動きを変えるか」の対応表そのもの。 */
+function boosted(p) {
+  if (!p || p.pr) return false;                 // 成った駒は元の動きを失っている
+  const my = sideAb[p.o] || {};
+  for (const id in DIAG_PIECE) {
+    if (!my[id]) continue;
+    const spec = DIAG_PIECE[id];
+    if (spec.t === p.t && !spec.pr) return true;
+  }
+  return false;
+}
+
 function pieceEl(p, extra = '') {
   const svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('viewBox', '0 0 100 110');
-  svg.setAttribute('class', 'pc ' + (p.o === GOTE ? 'gote ' : '') + (p.pr ? 'pr ' : '') + extra);
+  svg.setAttribute('class', 'pc ' + (p.o === GOTE ? 'gote ' : '') + (p.pr ? 'pr ' : '')
+    + (boosted(p) ? 'boost ' : '') + extra);
   const poly = document.createElementNS(SVGNS, 'polygon');
   poly.setAttribute('points', PENTA);
   const txt = document.createElementNS(SVGNS, 'text');
@@ -1127,6 +1141,12 @@ function pieceEl(p, extra = '') {
   txt.setAttribute('dominant-baseline', 'central');
   txt.textContent = p.pr ? PGLYPH[p.t] : (p.t === 'K' && p.o === GOTE ? '玉' : GLYPH[p.t]);
   svg.appendChild(poly); svg.appendChild(txt);
+  if (boosted(p)) {                              // 右肩に小さな印
+    const m = document.createElementNS(SVGNS, 'polygon');
+    m.setAttribute('class', 'pc-boost');
+    m.setAttribute('points', '56,24 82,24 82,50');   // 五角形の内側に収まる位置
+    svg.appendChild(m);
+  }
   return svg;
 }
 
@@ -1657,20 +1677,31 @@ function finish(winner, how) {
     const w = match.wins;
     const score = `▲ ${w.s} — ${w.g} △`;
     const why = how === 'king' ? '玉を取った。' : '指せる手が無くなった。';
+    // 自分がどちらの席かは、通信対戦や交代操作だと見失いやすい。
+    // 「▲の勝ち」ではなく「勝利/敗北」で言い切る。
+    const seat = mode === 'versus' && net.on ? net.seat : (match.cpu ? SENTE : null);
+    const champSide = w.s > w.g ? SENTE : GOTE;
+    const mine = seat === null ? null : champSide === seat;
     if (w.s >= 2 || w.g >= 2) {
-      const champ = w.s > w.g ? match.s : match.g;
-      const mark  = w.s > w.g ? '▲' : '△';
-      showOverlay(`${mark} ${champ.name} の勝利`, `${score}\n2本先取で決着。`, [
+      const champ = champSide === SENTE ? match.s : match.g;
+      const mark  = champSide === SENTE ? '▲' : '△';
+      const title = mine === null ? `${mark} ${champ.name} の勝利`
+                  : mine ? '勝　利' : '敗　北';
+      const body = (mine === null ? '' : `${mark} ${champ.name} の勝ち\n`)
+                 + `${score}\n2本先取で決着。`;
+      showOverlay(title, body, [
         ['同じ組み合わせでもう一番', () => startMatch(match.s, match.g, match.cpu)],
         ['編成を選び直す', openSetup],
         ['タイトルへ', toTitle],
-      ], 'MATCH END');
+      ], 'MATCH END', null, mine === null ? '' : (mine ? 'win' : 'lose'));
     } else {
-      showOverlay(`第${match.game}局  ${winner === SENTE ? '▲' : '△'}の勝ち`,
-        `${why}\n${score}\n先に2勝した方が勝ちです。`, [
+      const won = seat === null ? null : winner === seat;
+      const head = won === null ? `第${match.game}局  ${winner === SENTE ? '▲' : '△'}の勝ち`
+                 : won ? `第${match.game}局  勝ち` : `第${match.game}局  負け`;
+      showOverlay(head, `${why}\n${score}\n先に2勝した方が勝ちです。`, [
         ['次の局へ', () => { match.game++; startVersus(); }],
         ['タイトルへ', toTitle],
-      ], `GAME ${match.game}`);
+      ], `GAME ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'));
     }
     return;
   }
@@ -1988,7 +2019,9 @@ $('ability-close').addEventListener('click', () => $('ability-modal').classList.
 /* ============================================================
    オーバーレイ / 画面
    ============================================================ */
-function showOverlay(title, body, actions, tag = 'RESULT', rank = null) {
+function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '') {
+  $('overlay').classList.remove('win', 'lose');
+  if (mood) $('overlay').classList.add(mood);
   $('overlay-tag').textContent = tag;
   const rk = $('overlay-rank');
   if (rank) {
@@ -3114,6 +3147,21 @@ function renderPieceGuide() {
 
 /* 説明の各ページ。図が主役で、文章は一行に抑える */
 const TUTORIAL = [
+  {
+    title: 'まず、指しかた',
+    text: '盤の駒か、下の<b>持ち駒</b>を押すと、<b>緑の点</b>が動ける場所です。'
+        + 'そこをもう一度押すと指せます。押し間違えたら、選んだ駒をもう一度押せば戻ります。',
+    fig: () => {
+      const base = { 2:{t:'K',o:GOTE}, 22:{t:'K',o:SENTE} };
+      const mv = {}; for (const i of [6,7,8,16,18]) mv[i] = 'move'; mv[12] = 'land';
+      const dp = {}; for (let i = 0; i < NS; i++) if (!base[i] && i !== 12) dp[i] = 'drop';
+      return figPair(
+        figCap(miniBoard({ ...base, 12:{t:'S',o:SENTE} }, mv, { cls:'pair' }), '盤の駒 — 選ぶと緑が出る'),
+        figCap(miniBoard(base, dp, { cls:'pair' }), '持ち駒 — 空きマスならどこでも'))
+        + figTray('持ち駒', ['S','P'], null);
+    },
+    note: '成れる場所に入ると「成りますか」と聞かれます。迷ったら上の「早見」に駒の動きが載っています',
+  },
   {
     title: '駒を奪って、次の階へ',
     text: '相手の駒を取ると、それは<b>自分の持ち駒</b>になります。取った駒は次の階にも持って行けます。',
