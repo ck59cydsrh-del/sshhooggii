@@ -581,8 +581,8 @@ body.flipped .pc:not(.gote){transform:rotate(180deg)}
 .pc.gote polygon{fill:var(--ink)}
 .pc.gote text{fill:var(--paper)}
 /* 能力で動きが変わっている駒の印。右肩の小さな三角 */
-.pc-boost{fill:var(--glow);stroke:var(--ink);stroke-width:2;stroke-linejoin:miter}
-.pc.gote .pc-boost{fill:var(--glow);stroke:var(--paper)}
+.pc-boost path{fill:none;stroke:var(--green);stroke-width:6;stroke-linecap:butt}
+.pc.gote .pc-boost path{stroke:var(--glow)}
 .pc.pr polygon{stroke:var(--green)}
 .pc.pr text{fill:var(--green)}
 .pc.gote.pr polygon{fill:var(--green);stroke:var(--green)}
@@ -1092,3 +1092,22 @@ body.calm .pc.flyer{display:none}
 .deck-meter b.bonus.spent{background:transparent;box-shadow:inset 0 0 0 1px var(--green)}
 .ga-legend{margin-top:22px;border-top:1px solid var(--g12);padding-top:4px}
 .ga-legend .pb-ab{opacity:.9}
+
+/* 編成の段: コストや枠の表示は動かさず、選ぶ一覧だけを流す */
+#deck .screen-body{overflow:hidden;display:flex;flex-direction:column;
+  mask-image:none;-webkit-mask-image:none;padding-right:0}
+#deck .deck-sec{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+#deck .deck-sec.hidden{display:none}
+.deck-fixed{flex:none}
+#deck-pieces,#deck-abilities{flex:1 1 0;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  padding-right:10px;scrollbar-width:thin;scrollbar-color:var(--g26) transparent;
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}
+#deck-pieces::-webkit-scrollbar,#deck-abilities::-webkit-scrollbar{width:3px}
+#deck-pieces::-webkit-scrollbar-thumb,#deck-abilities::-webkit-scrollbar-thumb{background:var(--g26)}
+@media (max-height:560px){
+  #deck .screen-body{display:block;overflow:visible}
+  #deck .deck-sec{display:block}
+  #deck-pieces,#deck-abilities{overflow:visible;mask-image:none;-webkit-mask-image:none}
+}

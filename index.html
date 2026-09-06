@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788667227">
+<link rel="stylesheet" href="style.css?v=1788668308">
 </head>
 <body>
 <div id="crt"></div>
@@ -200,21 +200,25 @@
 
   <div class="screen-body">
   <div class="deck-sec" id="deck-sec-pieces">
-    <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
-    <p class="hint" id="deck-piece-hint"></p>
-    <div id="deck-quick" class="deck-quick hidden">
-      <button id="btn-pc-auto" class="mini">価値の高い順に10枚</button>
-      <button id="btn-pc-clear" class="mini">全部外す</button>
-      <span id="deck-piece-value" class="deck-value"></span>
+    <div class="deck-fixed">
+      <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
+      <p class="hint" id="deck-piece-hint"></p>
+      <div id="deck-quick" class="deck-quick hidden">
+        <button id="btn-pc-auto" class="mini">価値の高い順に10枚</button>
+        <button id="btn-pc-clear" class="mini">全部外す</button>
+        <span id="deck-piece-value" class="deck-value"></span>
+      </div>
     </div>
     <div id="deck-pieces" class="deck-pieces"></div>
   </div>
 
   <div class="deck-sec hidden" id="deck-sec-abils">
-    <p class="deck-head"><span>能力</span><b id="deck-cost">コスト 0 / 10　枠 0 / 5</b></p>
-    <div id="deck-meter" class="deck-meter"></div>
-    <p class="hint" id="deck-ab-hint"></p>
-    <div id="deck-filter" class="deck-filter"></div>
+    <div class="deck-fixed">
+      <p class="deck-head"><span>能力</span><b id="deck-cost">コスト 0 / 10　枠 0 / 5</b></p>
+      <div id="deck-meter" class="deck-meter"></div>
+      <p class="hint" id="deck-ab-hint"></p>
+      <div id="deck-filter" class="deck-filter"></div>
+    </div>
     <div id="deck-abilities" class="deck-abilities"></div>
   </div>
 
@@ -377,6 +381,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788667227"></script>
+<script src="game.js?v=1788668308"></script>
 </body>
 </html>

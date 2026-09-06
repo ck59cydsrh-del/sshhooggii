@@ -359,6 +359,11 @@ function canDropAt(pos, t, o, idx) {
   }
   if (ab(foe,'noEnemyDrop')) return false;
   if (ab(foe,'fortress') && nearKing(pos, foe, idx)) return false;
+  // 対戦の初手は自陣から三段目まで。開始early に敵陣の奥へ打ち込む形を防ぐ
+  if (mode === 'versus' && floorState && floorState.played && !floorState.played[o]) {
+    const depth = o === SENTE ? R - 1 - r : r;
+    if (depth > 2) return false;
+  }
   return true;
 }
 
@@ -622,7 +627,7 @@ function startFloor() {
     combo: ab(SENTE,'chainStart') ? 1 : 0,
     extraLeft: { s: ab(SENTE,'extraTurn') ? 1 + ab(SENTE,'extraTurn2') : 0, g: 0 },
     firstStrike: { s:false, g:false },
-    captured: {}, moves: 0,
+    captured: {}, moves: 0, played: { s:0, g:0 },
     budget, movesLeft: budget, grace: 0, collapse: 0, bestChain: 0, lastCalled: false,
   };
   sel = null; legal = []; busy = false;
@@ -667,7 +672,7 @@ function startVersus() {
     extraLeft: { s: ab(SENTE,'extraTurn') ? 1+ab(SENTE,'extraTurn2') : 0,
                  g: ab(GOTE,'extraTurn')  ? 1+ab(GOTE,'extraTurn2')  : 0 },
     firstStrike: { s:false, g:false },
-    captured: {}, moves: 0,
+    captured: {}, moves: 0, played: { s:0, g:0 },
     budget: 0, movesLeft: Infinity, grace: 0, collapse: 0,
     reviveLeft: { s: ab(SENTE,'revive') + ab(SENTE,'revive2'),
                   g: ab(GOTE,'revive')  + ab(GOTE,'revive2') },
@@ -1141,11 +1146,15 @@ function pieceEl(p, extra = '') {
   txt.setAttribute('dominant-baseline', 'central');
   txt.textContent = p.pr ? PGLYPH[p.t] : (p.t === 'K' && p.o === GOTE ? '玉' : GLYPH[p.t]);
   svg.appendChild(poly); svg.appendChild(txt);
-  if (boosted(p)) {                              // 右肩に小さな印
-    const m = document.createElementNS(SVGNS, 'polygon');
-    m.setAttribute('class', 'pc-boost');
-    m.setAttribute('points', '56,24 82,24 82,50');   // 五角形の内側に収まる位置
-    svg.appendChild(m);
+  if (boosted(p)) {                              // 右肩に「＋」。動きが足されている印
+    const g = document.createElementNS(SVGNS, 'g');
+    g.setAttribute('class', 'pc-boost');
+    for (const d of ['M62,34 H82', 'M72,24 V44']) {
+      const l = document.createElementNS(SVGNS, 'path');
+      l.setAttribute('d', d);
+      g.appendChild(l);
+    }
+    svg.appendChild(g);
   }
   return svg;
 }
@@ -1423,6 +1432,32 @@ function onCell(i) {
 $('promo-yes').addEventListener('click', () => { $('promo').classList.add('hidden'); applyMove({ ...pendingPromo, pr:true }); });
 $('promo-no').addEventListener('click',  () => { $('promo').classList.add('hidden'); applyMove({ ...pendingPromo, pr:false }); });
 
+/* 駒が駒を取ったときの一行。棋譜だけだと、盤の上で何が起きたのかが
+   数字と記号にしか見えない。連鎖が伸びるほど言い回しも荒くなる。 */
+const BATTLE_LINES = [
+  (a, b) => `${a}が${b}を斬り伏せた`,
+  (a, b) => `${b}、${a}の刃に沈む`,
+  (a, b) => `${a}の一撃、${b}を捉えた`,
+  (a, b) => `${a}が${b}を喰らい尽くす`,
+  (a, b) => `${b}は${a}の前に膝を折った`,
+  (a, b) => `${a}が${b}を断ち割る`,
+  (a, b) => `${b}、盤上から消える。${a}の手中へ`,
+  (a, b) => `${a}の踏み込みが${b}を貫いた`,
+];
+const BATTLE_LINES_HOT = [                       // 3連鎖から先
+  (a, b) => `${a}、止まらない。${b}も呑み込んだ`,
+  (a, b) => `${a}、${b}まで薙ぎ払う`,
+  (a, b) => `${a}の猛りが${b}を砕いた`,
+  (a, b) => `${b}、成す術なし。${a}の独壇場`,
+];
+function battleLine(mover, aType, aPr, bType, bPr, chain) {
+  const a = aPr ? PGLYPH[aType] : NAME[aType];
+  const b = bPr ? PGLYPH[bType] : NAME[bType];
+  const pool = chain >= 3 ? BATTLE_LINES_HOT : BATTLE_LINES;
+  const f = pool[(Math.random() * pool.length) | 0];
+  return `${mover === SENTE ? '▲' : '△'} ${f(a, b)}`;
+}
+
 function moveText(mv, mover) {
   const mark = mover === SENTE ? '▲' : '△';
   if (mv.drop) return `${mark}${sqName(mv.to)}${NAME[mv.drop]}打`;
@@ -1435,12 +1470,18 @@ function applyMove(mv, fromNet) {
   const mover = pos.turn;
   if (net.on && !fromNet && mover === net.seat) netSend(mv);
   const captured = mv.drop ? null : pos.b[mv.to];
+  const attacker = mv.drop ? null : { t: pos.b[mv.from].t, pr: pos.b[mv.from].pr };
   make(pos, mv);
   sel = null; legal = [];
   floorState.moves++;
+  if (floorState.played) floorState.played[mover]++;
   const landed = mv.to;
 
-  let msg = moveText(mv, mover);
+  // 取った手は棋譜ではなく、盤の上で何が起きたかを言う
+  let msg = (captured && captured.t !== 'K' && attacker)
+    ? battleLine(mover, attacker.t, attacker.pr, captured.t, captured.pr,
+                 mode === 'solo' && floorState ? floorState.combo : 0)
+    : moveText(mv, mover);
   let extra = false;
   if (ab(mover,'firstStrike') && !floorState.firstStrike[mover]) { floorState.firstStrike[mover] = true; extra = true; announce('firstStrike'); }
 
@@ -2414,8 +2455,8 @@ function openDeck(side, src, next) {
     `<span class="dt-side">${side === SENTE ? '▲ 先手' : '△ 後手'}</span>` +
     `<span class="dt-name">${src.name}</span>`;
   $('deck-piece-hint').textContent = deckEdit.fixed
-    ? '既定編成の駒は固定です。能力だけ組み替えられます。'
-    : '潜って持ち帰った駒から10枚を選びます。';
+    ? '既定編成の駒は固定。能力だけ組み替えられます'
+    : '持ち帰った駒から10枚を選びます';
   renderDeck();
 }
 
@@ -2463,10 +2504,8 @@ function renderDeck() {
     `コスト <b class="${cost >= deckBudget ? 'full' : ''}">${cost}</b> / ${deckBudget}` +
     `　枠 <b class="${slots >= DECK_SLOTS ? 'full' : ''}">${slots}</b> / ${DECK_SLOTS}`;
   $('deck-ab-hint').innerHTML = d.dive
-    ? `持ち帰った能力は<b>安い</b>(並1 / 希2 / 極5)。`
-      + (d.bonus ? `スコアで<b>予算 +${d.bonus}</b>。` : 'スコア30万ごとに予算 +1。')
-      + '選んだものは上に並びます。'
-    : '既定編成は 並2 / 希4 / 極10。選んだものは上に並びます。';
+    ? `並1 / 希2 / 極5` + (d.bonus ? `　<b>スコアで予算 +${d.bonus}</b>` : '　スコア30万ごとに予算 +1')
+    : '並2 / 希4 / 極10';
   const meter = $('deck-meter');
   meter.innerHTML = '';
   for (let i = 0; i < deckBudget; i++) {
