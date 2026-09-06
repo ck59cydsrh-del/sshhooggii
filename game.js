@@ -96,7 +96,7 @@ const ABILITIES = [
   { id:'sweep',     n:'総取り', r:3, d:'階の突破時、盤に残った敵の駒を全部奪う(斬首したとき有効)' },
 
   // --- 狩り(突破の仕方で分岐する) ---
-  { id:'hunter',   n:'狩人',   r:1, d:'守備隊を狩り尽くして突破すると、スコア2倍' },
+  { id:'hunter',   n:'狩人',   r:2, d:'守備隊を狩り尽くして突破すると、スコア2倍' },
   { id:'decap',    n:'首狩り', r:1, d:'玉を取って突破すると、速攻ボーナスが2倍' },
   { id:'massacre', n:'皆殺し', r:3, d:'狩り尽くして突破すると、その階の戦果をさらに2組もらう' },
   { id:'avalanche',n:'雪崩',   r:3, d:'駒を取ると、盤に残る同じ種類の敵の駒もまとめて奪う' },
@@ -105,9 +105,9 @@ const ABILITIES = [
   // --- 連鎖 ---
   { id:'chainMult',  n:'連鎖倍加', r:2, d:'連鎖1つあたりのスコア倍率が2倍になる' },
   { id:'chainRush',  n:'連鎖疾走', r:3, d:'連鎖3以上のあいだ、手数を消費しない' },
-  { id:'chainBlast', n:'連鎖爆風', r:3, d:'連鎖5以上で取ると、その隣にいる敵の駒も巻き込んで取る' },
+  { id:'chainBlast', n:'連鎖爆風', r:2, d:'連鎖5以上で取ると、その隣にいる敵の駒も巻き込んで取る' },
   { id:'crossCut',   n:'一網打尽', r:3, d:'連鎖5以上で取ると、その筋と段にいる敵の駒を全部巻き込む' },
-  { id:'doubleDown', n:'倍賭け',   r:2, d:'連鎖1つにつきスコア倍率 +0.5(連鎖が切れると戻る)' },
+  { id:'doubleDown', n:'倍賭け',   r:3, d:'連鎖1つにつきスコア倍率 +0.5(連鎖が切れると戻る)' },
 
   // --- 崩壊 ---
   { id:'collapseGuard', n:'支柱',   r:1, d:'崩壊が始まってから3手は増援が降らない' },
@@ -118,7 +118,7 @@ const ABILITIES = [
   // --- 生存 ---
   { id:'revive',    n:'影武者',   r:3, d:'玉を取られても1度だけ復活(持ち駒は半減)' },
   { id:'revive2',   n:'影武者衆', r:2, d:'復活の回数 +1', req:'revive' },
-  { id:'sacrifice', n:'身代わり', r:3, d:'玉を取られるとき、持ち駒の歩1枚を失って無かったことにする' },
+  { id:'sacrifice', n:'身代わり', r:3, d:'玉を取られるとき、持ち駒の歩1枚を失って無かったことにする(階1回)' },
 
   // --- 地形 ---
   { id:'terrainMine', n:'抜け道',   r:1, d:'通行不可マスを通り抜けられる(止まれはしない)' },
@@ -127,7 +127,7 @@ const ABILITIES = [
   // --- スコア ---
   { id:'greed',     n:'強欲',     r:1, d:'スコア倍率 +0.3' },
   { id:'snowball',  n:'雪だるま', r:2, d:'スコア倍率 +0.1×到達階' },
-  { id:'bigGame',   n:'一攫千金', r:2, d:'飛・角を取るとスコア3倍' },
+  { id:'bigGame',   n:'一攫千金', r:2, d:'飛・角・金を取るとスコア3倍' },
   { id:'comboKeep', n:'粘着',     r:1, d:'連鎖が切れるまでの猶予 +1手' },
 
   // --- 手数 ---
@@ -632,6 +632,7 @@ function startFloor() {
     firstStrike: { s:false, g:false },
     captured: {}, moves: 0, played: { s:0, g:0 },
     budget, movesLeft: budget, grace: 0, collapse: 0, bestChain: 0, lastCalled: false,
+    sacUsed: { s:false, g:false },
   };
   sel = null; legal = []; busy = false;
   hideOverlay(); $('draft').classList.add('hidden');
@@ -676,7 +677,7 @@ function startVersus() {
                  g: ab(GOTE,'extraTurn')  ? 1+ab(GOTE,'extraTurn2')  : 0 },
     firstStrike: { s:false, g:false },
     captured: {}, moves: 0, played: { s:0, g:0 },
-    budget: 0, movesLeft: Infinity, grace: 0, collapse: 0,
+    budget: 0, movesLeft: Infinity, grace: 0, collapse: 0, sacUsed: { s:false, g:false },
     reviveLeft: { s: ab(SENTE,'revive') + ab(SENTE,'revive2'),
                   g: ab(GOTE,'revive')  + ab(GOTE,'revive2') },
   };
@@ -2029,7 +2030,10 @@ function cheatDeath(o) {
     maybeCpuMove();
     return true;
   }
-  if (ab(o,'sacrifice') && pos.h[o].P > 0) {
+  // 歩がある限り何度でも助かると、影武者(通算1回)の完全な上位になってしまう。
+  // 歩1枚に加えて「階に1回」を代償にして、影武者との棲み分けを作る
+  if (ab(o,'sacrifice') && pos.h[o].P > 0 && floorState && !floorState.sacUsed[o]) {
+    floorState.sacUsed[o] = true;
     pos.h[o].P--;
     sfx.revive(); shake(1.8);
     const spot = restoreKing(o);
