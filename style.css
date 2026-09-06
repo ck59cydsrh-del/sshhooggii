@@ -275,14 +275,29 @@ body{
 /* 対戦の入り。上下から突き合わせ、中央の「対」を叩きつける */
 #matchup{position:fixed;inset:0;z-index:90;background:var(--paper);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  padding:24px;cursor:pointer;overflow:hidden;animation:muIn .22s linear}
-@keyframes muIn{from{opacity:0}to{opacity:1}}
+  padding:24px;cursor:pointer;overflow:hidden}
 #matchup.out{animation:muOut .38s linear forwards;pointer-events:none}
 @keyframes muOut{from{opacity:1}to{opacity:0}}
-/* 決まった瞬間、盤へ抜ける前に一度だけ白く飛ばす */
-#matchup.go::after{content:'';position:absolute;inset:0;background:var(--paper);
-  animation:muGo .5s linear forwards;pointer-events:none}
-@keyframes muGo{0%{opacity:0}22%{opacity:.9}100%{opacity:0}}
+/* 決まったら、編成カードが左右へ払われて盤へ抜ける(点滅させない) */
+#matchup.go .mu-side:nth-child(2){animation:muExitL .42s var(--jelly-soft) forwards}
+#matchup.go .mu-side:nth-child(4){animation:muExitR .42s var(--jelly-soft) .06s forwards}
+#matchup.go .mu-round{animation:muFade .3s linear forwards}
+@keyframes muExitL{to{opacity:0;transform:translateX(-40px)}}
+@keyframes muExitR{to{opacity:0;transform:translateX(40px)}}
+@keyframes muFade{to{opacity:0}}
+/* 「対」だけが残って大きくなる */
+#matchup.go .mu-vs b{animation:muHold .6s var(--jelly-soft) forwards}
+@keyframes muHold{to{transform:scale(1.9)}}
+#matchup.go .mu-vs::before{animation:muFade .3s linear forwards}
+#matchup.go .mu-vs::after{animation:muFade .3s linear forwards}
+/* 中央から広がる輪 */
+.mu-ring{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;
+  border:2px solid var(--ink);border-radius:50%;pointer-events:none;
+  animation:muRing .62s var(--jelly-soft) backwards}
+@keyframes muRing{
+  from{width:44px;height:44px;margin:-22px 0 0 -22px;opacity:.9}
+  to{width:720px;height:720px;margin:-360px 0 0 -360px;opacity:0;border-width:1px}
+}
 
 .mu-round{font-family:var(--didone);font-size:13px;letter-spacing:.44em;color:var(--g45);
   margin-bottom:2px;animation:muCard .3s var(--jelly) backwards}
@@ -321,7 +336,7 @@ body{
 @keyframes muLineR{from{width:0;opacity:0}to{width:calc(50% - 32px);opacity:1}}
 body.calm .mu-side,body.calm .mu-vs b,body.calm .mu-round{animation:none}
 body.calm .mu-vs::before,body.calm .mu-vs::after{animation:none;width:calc(50% - 32px)}
-body.calm #matchup.go::after{animation:none;opacity:0}
+body.calm #matchup.go *{animation:none !important}
 
 /* ---------- はじめての説明 ---------- */
 .tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}

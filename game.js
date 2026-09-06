@@ -2928,8 +2928,20 @@ function showMatchup(a, b, then) {
   box.classList.remove('go'); void box.offsetWidth;
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる
   sfx.ui();
-  setTimeout(() => { if (!motionCalm) { sfx.big(); shake(2.2); flashScreen(); } }, 620);
-  setTimeout(() => { box.classList.add('go'); if (!motionCalm) { sfx.jackpot(); ringBurst(3); } }, 1500);
+  setTimeout(() => { if (!motionCalm) { sfx.big(); shake(2.6); } }, 620);
+  setTimeout(() => {
+    box.classList.add('go');
+    if (motionCalm) return;
+    sfx.jackpot(); shake(1.8);
+    // 中央から輪が広がる。盤の ringBurst は演出の下に隠れるので、ここに置く
+    for (let i = 0; i < 2; i++) {
+      const r = document.createElement('div');
+      r.className = 'mu-ring';
+      r.style.animationDelay = (i * 110) + 'ms';
+      box.appendChild(r);
+      setTimeout(() => r.remove(), 900 + i * 110);
+    }
+  }, 1750);
   let done = false;
   const go = () => {
     if (done) return;
@@ -2939,7 +2951,7 @@ function showMatchup(a, b, then) {
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
   };
   box.addEventListener('click', go);
-  setTimeout(go, 3300);            // 触らなくても進む
+  setTimeout(go, 2400);            // 触らなくても進む
 }
 
 $('btn-setup-start').addEventListener('click', async () => {
@@ -3013,8 +3025,8 @@ $('btn-setup-start').addEventListener('click', async () => {
       }
       const theirs = (meta && meta[foe]) || randomFoe();
       lastVersus = net.seat === SENTE ? { s:deck, g:theirs } : { s:theirs, g:deck };
-      toGame();
-      showMatchup(lastVersus.s, lastVersus.g, () => startMatch(lastVersus.s, lastVersus.g, false));
+      showMatchup(lastVersus.s, lastVersus.g,
+        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, false); }, 'round'));
     });
     return;
   }
@@ -3022,13 +3034,13 @@ $('btn-setup-start').addEventListener('click', async () => {
   openDeck(SENTE, srcS, deckS => {
     if (cpu) {
       lastVersus = { s:deckS, g:randomFoe() };
-      toGame();
-      return showMatchup(lastVersus.s, lastVersus.g, () => startMatch(lastVersus.s, lastVersus.g, true));
+      return showMatchup(lastVersus.s, lastVersus.g,
+        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, true); }, 'round'));
     }
     openDeck(GOTE, srcG, deckG => {
       lastVersus = { s:deckS, g:deckG };
-      toGame();
-      showMatchup(deckS, deckG, () => startMatch(deckS, deckG, false));
+      showMatchup(deckS, deckG,
+        () => floorTransition(1, () => { toGame(); startMatch(deckS, deckG, false); }, 'round'));
     });
   });
 });
