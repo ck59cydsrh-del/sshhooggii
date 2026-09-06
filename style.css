@@ -1314,3 +1314,6 @@ body.calm .pc.flyer{display:none}
 body:has(#game:not(.hidden)){
   padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 12px));
 }
+
+/* 音を切ったままなのを、タイトルでも分かるようにする */
+.mi.muted-note .mi-sub{color:var(--ink)}

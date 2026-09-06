@@ -1088,6 +1088,9 @@ function loadBgm() {
     .catch(() => { bgmBuf = null; });
 }
 function startBgm(instant) {
+  // 音を消していても鳴り出す道が複数あった(起動時の primeAudio、対戦の
+  // 入り演出)。呼ぶ側それぞれで見るのは漏れるので、ここで一度に止める
+  if (!soundOn || volBgm <= 0) return;
   const x = ac();
   if (!x || !bgmBuf || bgmBuf === 'loading' || bgmSrc) return;
   bgmGain = x.createGain();
@@ -2455,6 +2458,12 @@ function showRoute() {
   vs.classList.toggle('primary', saved.length > 0);
   $('btn-presets').querySelector('.mi-sub').textContent =
     saved.length ? `持ち帰った編成 ${saved.length} / ${SLOTS}` : 'まだ何も持ち帰っていない';
+  // 音を切ったまま起動すると、盤に入るまで気づけない。タイトルで言う
+  const st = $('btn-settings');
+  if (st) {
+    st.querySelector('.mi-sub').textContent = soundOn ? '音量と演出' : '音は消えています — ここで戻せます';
+    st.classList.toggle('muted-note', !soundOn);
+  }
 }
 
 /* ---------- プリセット ---------- */
@@ -3740,6 +3749,7 @@ function setSound(on, quiet) {
   b.title = on ? '音を消す' : '音を鳴らす';
   const sel = $('opt-sound'); if (sel) sel.value = on ? 'on' : 'off';
   if (on) { loadSfx(); startBgm(); } else stopBgm();
+  if ($('btn-settings')) showRoute();
   if (!quiet) setLog(on ? '音を鳴らします。' : '音を消しました。もう一度 ♪ で戻せます。');
 }
 $('btn-sound').addEventListener('click', () => setSound(!soundOn));
