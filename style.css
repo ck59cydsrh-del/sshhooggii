@@ -425,6 +425,8 @@ body.calm .preset-body{animation:none}
 .hud-floor-text{display:flex;flex-direction:column;gap:5px}
 #floor-label{font-size:11px;letter-spacing:.24em;color:var(--ink);white-space:nowrap}
 #turn-label{font-size:9.5px;letter-spacing:.22em;color:var(--g70)}
+/* あと少しで抜けられる、が常に目に入るように */
+#turn-label.close{color:var(--ink);background:var(--glow);padding:2px 6px;margin-left:-6px}
 .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 /* ボタンを縦に積むとHUDだけで163pxを使い、盤が小さくなっていた */
 .hud-btns{display:flex;align-items:center;gap:4px}
@@ -566,7 +568,7 @@ body.fever .cell.move::after{background:var(--glow-hi)}
 .cell.clickable{cursor:pointer}
 
 /* ---------- 駒 ---------- */
-.pc{width:78%;height:78%;overflow:visible;display:block}
+.pc{width:84%;height:84%;overflow:visible;display:block}
 .pc polygon{fill:var(--paper);stroke:var(--ink);stroke-width:2.4;stroke-linejoin:miter}
 .pc text{font-family:var(--mincho);font-size:54px;font-weight:400;fill:var(--ink)}
 .pc.gote{transform:rotate(180deg)}
@@ -593,7 +595,7 @@ body.flipped .pc:not(.gote).placed{animation:jellyGote .42s var(--jelly)}
   70%{transform:rotate(180deg) scale(1.03,.98)}
   100%{transform:rotate(180deg) scale(1,1)}
 }
-.pc.hand{width:30px;height:33px;cursor:pointer;transition:transform .1s var(--jelly-soft)}
+.pc.hand{width:32px;height:35px;cursor:pointer;transition:transform .1s var(--jelly-soft)}
 .pc.hand:active{transform:scale(.86,1.16)}
 .pc.gote.hand:active{transform:rotate(180deg) scale(.86,1.16)}
 body.flipped .pc.gote.hand:active{transform:scale(.86,1.16)}
@@ -607,7 +609,17 @@ body.flipped .pc:not(.gote).hand:active{transform:rotate(180deg) scale(.86,1.16)
   font-family:var(--sans);font-size:12px;font-weight:400;letter-spacing:.14em;
   color:var(--ink);white-space:nowrap;animation:pop .7s linear forwards;
 }
-.pop.big{font-size:16px;color:var(--green)}
+.pop.mid{font-size:14px;color:var(--green)}
+.pop.big{font-size:19px;color:var(--green)}
+.pop.huge{font-size:26px;color:var(--green);letter-spacing:.06em;
+  text-shadow:0 0 0 var(--paper);animation:popHuge .9s linear forwards}
+@keyframes popHuge{
+  0%{opacity:0;transform:translate(-50%,-40%) scale(.6)}
+  12%{opacity:1;transform:translate(-50%,-58%) scale(1.18)}
+  22%{transform:translate(-50%,-60%) scale(1)}
+  70%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-92%) scale(1)}
+}
 .pop.mark{color:var(--g45);font-size:10px}
 .pop.warn{color:var(--green)}
 @keyframes pop{
@@ -652,6 +664,9 @@ body.flipped .pc:not(.gote).hand:active{transform:rotate(180deg) scale(.86,1.16)
 @keyframes combobump{50%{opacity:.3}}
 
 /* FEVER = 盤は白のまま。縁の緑と連鎖の色だけで示す(背景は動かさない) */
+/* 連鎖の段。数字を見ていなくても、盤の縁で今どこにいるか分かる */
+body[data-chain="2"] #board{box-shadow:0 0 0 1px var(--g45)}
+body[data-chain="3"] #board{box-shadow:0 0 0 2px var(--green)}
 body.fever #board{box-shadow:0 0 0 3px var(--glow)}
 body.fever .cell.zone::before{background:var(--glow)}
 body.fever .combo span{color:var(--green)}
@@ -1064,3 +1079,5 @@ body.calm .pc.flyer{display:none}
   margin-left:3px}
 .deck-meter b.bonus{background:var(--green)}
 .deck-meter b.bonus.spent{background:transparent;box-shadow:inset 0 0 0 1px var(--green)}
+.ga-legend{margin-top:22px;border-top:1px solid var(--g12);padding-top:4px}
+.ga-legend .pb-ab{opacity:.9}

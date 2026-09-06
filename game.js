@@ -971,6 +971,8 @@ function ringBurst(strength = 1) {
 }
 
 function showCombo(n) {
+  // 連鎖の段階を盤の縁で示す。FEVER(5)まで一段ずつ締まっていく
+  document.body.dataset.chain = n >= 5 ? '5' : n >= 3 ? '3' : n >= 2 ? '2' : '0';
   const el = $('combo');
   if (n < 2) { el.classList.add('hidden'); return; }
   $('combo-n').textContent = '×' + n;
@@ -1219,9 +1221,12 @@ function render() {
 
   if (mode === 'solo') {
     $('floor-label').textContent = 'FLOOR ' + String(run.floor).padStart(2, '0');
+    const left = garrisonLeft(pos);
     $('turn-label').textContent = pos.turn === SENTE
-      ? 'GARRISON ' + String(garrisonLeft(pos)).padStart(2, '0')
+      ? 'GARRISON ' + String(left).padStart(2, '0')
       : 'ENEMY THINKING';
+    // 残りが少なくなるほど強く出す。あと何枚で抜けられるかが常に目に入るように
+    $('turn-label').className = pos.turn === SENTE && left <= 3 ? 'close' : '';
     $('score').textContent = run.score.toLocaleString('ja-JP');
     $('score').style.visibility = '';
   } else {
@@ -1334,6 +1339,18 @@ function renderCharges() {
   box.innerHTML = '';
   if (!floorState) { box.classList.add('hidden'); return; }
   const rows = [];
+  const legend = `<div class="ga-legend">
+    <p class="ga-head">稀少度の目安</p>
+    <div class="pb-ab r1"><span class="pb-r">並</span>
+      <span class="pb-n"><b>並</b></span><span class="pb-tag">よく出る</span>
+      <span class="pb-d">駒1枚ぶんくらいの上積み。積み重ねて効く</span></div>
+    <div class="pb-ab r2"><span class="pb-r">希</span>
+      <span class="pb-n"><b>希</b></span><span class="pb-tag">たまに出る</span>
+      <span class="pb-d">戦い方が変わる。1つ引くと動かし方の軸になる</span></div>
+    <div class="pb-ab r3"><span class="pb-r">極</span>
+      <span class="pb-n"><b>極</b></span><span class="pb-tag">まれ</span>
+      <span class="pb-d">その潜行の組み立てが変わる。引いたら軸を寄せる価値がある</span></div>
+  </div>`;
   if (mode === 'versus' && match) {
     rows.push(['▲ ' + match.s.name, match.wins.s, 2, false]);
     rows.push(['△ ' + match.g.name, match.wins.g, 2, false]);
@@ -1415,7 +1432,10 @@ function applyMove(mv, fromNet) {
       const big = ab(SENTE,'bigGame') && (captured.t === 'R' || captured.t === 'B' || captured.t === 'G') ? 3 : 1;
       const per = ab(SENTE,'chainMult') ? 0.5 : 0.25;
       const gained = addScore(pieceVal(captured) * (1 + floorState.combo*per) * scoreMult() * big);
-      popText(mv.to, '+' + gained.toLocaleString('ja-JP'), big > 1 ? 'big' : '');
+      const cls = gained >= 100000 ? 'huge' : gained >= 20000 ? 'big'
+                : gained >= 5000 ? 'mid' : (big > 1 ? 'big' : '');
+      popText(mv.to, '+' + gained.toLocaleString('ja-JP'), cls);
+      if (gained >= 20000) { shake(gained >= 100000 ? 2.4 : 1.6); flashScreen(gained >= 100000 ? 'hard' : ''); }
       showCombo(floorState.combo);
       floorState.bestChain = Math.max(floorState.bestChain || 0, floorState.combo);
       showJudge(floorState.combo, big > 1 || captured.t === 'R' || captured.t === 'B');
@@ -1712,10 +1732,18 @@ function finish(winner, how) {
   // 撤退の誘惑を数字で見せる。「もう一階だけ」との天秤がこの遊びの芯
   const abN = Object.values(run.abilities).reduce((a, b) => a + b, 0);
   const carry = `駒${after}枚 / 能力${abN}個 / ${run.score.toLocaleString('ja-JP')}点を持ち帰る`;
+  // 次の階がどれくらいか分からないまま賭けさせない
+  const nf = run.floor + 1;
+  const force = enemyForce(nf);
+  const nHand = nf >= 8 ? Math.min(4, Math.floor((nf - 6) / 2)) : 0;
+  const nBlock = nf >= 9 ? 3 : nf >= 6 ? 2 : nf >= 3 ? 1 : 0;
+  const ahead = `敵 ${force.length}枚(${force.map(t => NAME[t]).join('')})`
+    + (nHand ? ` ＋持ち駒${nHand}` : '') + (nBlock ? ` / 通行不可${nBlock}` : '')
+    + ` / 手数${floorBudget(nf)}`;
   showOverlay(`${run.floor}階 突破`, body, [
     ['能力を選ぶ', () => openDraft(() => { run.floor++; floorTransition(run.floor, startFloor); },
         'CLEAR ' + String(run.floor).padStart(2, '0'), `${run.floor}階の戦利`),
-      `${run.floor + 1}階へ。倒れれば全部失う`],
+      `${nf}階 — ${ahead}。倒れれば全部失う`],
     ['撤退して編成を保存', () => openPresets('save'), carry],
   ], 'CLEAR ' + String(run.floor).padStart(2, '0'), rank);
 }
@@ -3051,11 +3079,24 @@ function renderGuideAbils() {
         </div>`;
       }).join('');
   };
+  const legend = `<div class="ga-legend">
+    <p class="ga-head">稀少度の目安</p>
+    <div class="pb-ab r1"><span class="pb-r">並</span>
+      <span class="pb-n"><b>並</b></span><span class="pb-tag">よく出る</span>
+      <span class="pb-d">駒1枚ぶんくらいの上積み。積み重ねて効く</span></div>
+    <div class="pb-ab r2"><span class="pb-r">希</span>
+      <span class="pb-n"><b>希</b></span><span class="pb-tag">たまに出る</span>
+      <span class="pb-d">戦い方が変わる。1つ引くと動かし方の軸になる</span></div>
+    <div class="pb-ab r3"><span class="pb-r">極</span>
+      <span class="pb-n"><b>極</b></span><span class="pb-tag">まれ</span>
+      <span class="pb-d">その潜行の組み立てが変わる。引いたら軸を寄せる価値がある</span></div>
+  </div>`;
   if (mode === 'versus' && match) {
     box.innerHTML = `<div class="pb-abils">${rows(sideAb[SENTE], '自分')}</div>`
-                  + `<div class="pb-abils">${rows(sideAb[GOTE], '相手')}</div>`;
+                  + `<div class="pb-abils">${rows(sideAb[GOTE], '相手')}</div>` + legend;
   } else {
-    box.innerHTML = `<div class="pb-abils">${rows(run ? run.abilities : {}, 'この潜行で修得した能力')}</div>`;
+    box.innerHTML = `<div class="pb-abils">${rows(run ? run.abilities : {}, 'この潜行で修得した能力')}</div>`
+                  + legend;
   }
 }
 
