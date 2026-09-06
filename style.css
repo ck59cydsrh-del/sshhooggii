@@ -275,7 +275,8 @@ body{
 /* 対戦の入り。上下から突き合わせ、中央の「対」を叩きつける */
 #matchup{position:fixed;inset:0;z-index:90;background:var(--paper);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  padding:24px;cursor:pointer;overflow:hidden}
+  padding:24px;cursor:pointer;overflow:hidden;transition:background .34s linear}
+#matchup.go{background:var(--ink)}
 #matchup.out{animation:muOut .38s linear forwards;pointer-events:none}
 @keyframes muOut{from{opacity:1}to{opacity:0}}
 /* 決まったら、編成カードが左右へ払われて盤へ抜ける(点滅させない) */
@@ -290,24 +291,43 @@ body{
 @keyframes muHold{to{opacity:0;transform:scale(2.6)}}
 #matchup.go .mu-vs::before{animation:muFade .3s linear forwards}
 #matchup.go .mu-vs::after{animation:muFade .3s linear forwards}
-/* 「対」が退いた後に叩き込む一撃 */
+/* 「対」が退いた後に叩き込む一撃。版ズレで三重に刷る */
 .mu-kick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  font-family:var(--mincho);font-size:44px;letter-spacing:.24em;color:var(--ink);
-  white-space:nowrap;pointer-events:none;
-  animation:muKick .8s cubic-bezier(.16,1.6,.3,1) .22s backwards}
+  font-family:var(--didone);font-size:58px;font-weight:400;letter-spacing:.16em;
+  color:var(--paper);white-space:nowrap;pointer-events:none;line-height:1;
+  animation:muKick .95s cubic-bezier(.16,1.6,.3,1) .18s both}
+.mu-kick span{position:relative;z-index:2;display:block}
+.mu-kick::before,.mu-kick::after{content:attr(data-t);position:absolute;left:0;top:0;
+  letter-spacing:.16em}
+.mu-kick::before{color:var(--glow);animation:muSlipA .95s steps(6,end) .18s both}
+.mu-kick::after{color:var(--g45);animation:muSlipB .95s steps(5,end) .18s both}
 @keyframes muKick{
-  0%{opacity:0;transform:translate(-50%,10%) scale(.7) skewX(-14deg)}
-  26%{opacity:1;transform:translate(-50%,-50%) scale(1.12) skewX(0)}
-  40%{transform:translate(-50%,-50%) scale(1)}
-  78%{opacity:1}
-  100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}
+  0%{opacity:0;transform:translate(-50%,14%) scale(.66) skewX(-16deg)}
+  22%{opacity:1;transform:translate(-50%,-50%) scale(1.14) skewX(0)}
+  36%{transform:translate(-50%,-50%) scale(1)}
+  82%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.05)}
+}
+@keyframes muSlipA{
+  0%,100%{transform:translate(0,0)}
+  22%{transform:translate(-7px,3px)}
+  40%{transform:translate(5px,-2px)}
+  62%{transform:translate(-3px,1px)}
+  80%{transform:translate(2px,0)}
+}
+@keyframes muSlipB{
+  0%,100%{transform:translate(0,0)}
+  30%{transform:translate(6px,-3px)}
+  52%{transform:translate(-5px,2px)}
+  74%{transform:translate(3px,-1px)}
 }
 #matchup.go .mu-vs b{animation:muHold .5s var(--jelly-soft) forwards}
+#matchup.go .mu-ring{border-color:var(--paper)}
 
 /* 中央から広がる輪 */
 .mu-ring{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;
   border:2px solid var(--ink);border-radius:50%;pointer-events:none;
-  animation:muRing .62s var(--jelly-soft) backwards}
+  animation:muRing .62s var(--jelly-soft) both}
 @keyframes muRing{
   from{width:44px;height:44px;margin:-22px 0 0 -22px;opacity:.9}
   to{width:720px;height:720px;margin:-360px 0 0 -360px;opacity:0;border-width:1px}
@@ -360,6 +380,7 @@ body.calm .mu-side,body.calm .mu-vs b,body.calm .mu-round,
 body.calm .mu-pieces .ap,body.calm .mu-abils .chip{animation:none}
 body.calm .mu-vs::before,body.calm .mu-vs::after{animation:none;width:calc(50% - 32px)}
 body.calm #matchup.go *{animation:none !important}
+body.calm #matchup{transition:none}
 
 /* ---------- はじめての説明 ---------- */
 .tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}
@@ -1226,9 +1247,7 @@ body.calm .pc.flyer{display:none}
 .vl i.breaking{animation:lifeBreak .5s var(--jelly) forwards}
 
 /* 玉が取られる位置にいる。相手の利きは見せずに、結果だけを示す */
-@keyframes dangerPulse{0%,100%{box-shadow:inset 0 0 0 3px var(--ink)}50%{box-shadow:inset 0 0 0 3px transparent}}
-.cell.in-danger{animation:dangerPulse .62s steps(2,end) infinite}
-body.calm .cell.in-danger{animation:none;box-shadow:inset 0 0 0 3px var(--ink)}
+/* 玉が取られる位置にいても、盤には出さない(気づくかどうかも勝負のうち) */
 .cell.in-reach{box-shadow:inset 0 0 0 2px var(--green)}
 .stamp.danger{font-family:var(--mincho);font-size:30px;letter-spacing:.18em;color:var(--ink)}
 

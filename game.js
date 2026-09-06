@@ -1284,7 +1284,7 @@ function render() {
     if (p) {
       cell.appendChild(pieceEl(p));
       if (active && p.o === pos.turn) cell.classList.add('clickable');
-      if (p.t === 'K' && checkedSides[p.o]) cell.classList.add(p.o === myView() ? 'in-danger' : 'in-reach');
+      if (p.t === 'K' && p.o !== myView() && checkedSides[p.o]) cell.classList.add('in-reach');
     }
     cell.addEventListener('click', () => onCell(i));
     board.appendChild(cell);
@@ -2951,7 +2951,8 @@ function showMatchup(a, b, then) {
     // 「対」が退いたあとに、開戦を叩き込む
     const kick = document.createElement('div');
     kick.className = 'mu-kick';
-    kick.textContent = '開　戦';
+    kick.dataset.t = 'FIGHT';                    // 版ズレで三重に刷る
+    kick.innerHTML = '<span>FIGHT</span>';
     box.appendChild(kick);
     // 中央から輪が広がる。盤の ringBurst は演出の下に隠れるので、ここに置く
     for (let i = 0; i < 2; i++) {
@@ -2967,11 +2968,17 @@ function showMatchup(a, b, then) {
     if (done) return;
     done = true;
     box.removeEventListener('click', go);
+    box.querySelectorAll('.mu-kick, .mu-ring').forEach(e => e.remove());
+    // 墨に落ちきっていれば、そのまま帯へ渡す(溶かすと紙が一瞬覗く)
+    if (box.classList.contains('go')) {
+      box.classList.add('hidden'); box.classList.remove('go');
+      then(); return;
+    }
     box.classList.add('out');                    // 消えぎわを溶かす
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
   };
   box.addEventListener('click', go);
-  setTimeout(go, 2750);            // 触らなくても進む
+  setTimeout(go, 2900);            // 触らなくても進む
 }
 
 $('btn-setup-start').addEventListener('click', async () => {
