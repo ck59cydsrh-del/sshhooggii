@@ -1071,7 +1071,7 @@ function loadBgm() {
     .then(buf => { bgmBuf = buf; if (soundOn && volBgm > 0) startBgm(); })
     .catch(() => { bgmBuf = null; });
 }
-function startBgm() {
+function startBgm(instant) {
   const x = ac();
   if (!x || !bgmBuf || bgmBuf === 'loading' || bgmSrc) return;
   bgmGain = x.createGain();
@@ -1084,7 +1084,9 @@ function startBgm() {
   bgmSrc.loopEnd = Math.min(BGM_BARS, bgmBuf.duration);  // 小節の切れ目で正確に折り返す
   bgmSrc.connect(bgmGain);
   bgmSrc.start();
-  bgmGain.gain.linearRampToValueAtTime(volBgm, x.currentTime + 1.2);
+  // 合図の直後は溶かさずそのまま鳴らし始める
+  if (instant) bgmGain.gain.setValueAtTime(volBgm, x.currentTime);
+  else bgmGain.gain.linearRampToValueAtTime(volBgm, x.currentTime + 1.2);
 }
 function stopBgm() {
   if (!bgmSrc) return;
@@ -2997,10 +2999,10 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 演出のあいだは音を置かない。BGMは止めておく(あとで頭から掛け直す)
+  // 頭から入りの音。BGMは止めておく(合図のあと頭から掛け直す)
   hushBgm(false);
   stopBgm();
-  let fightSfx = null;
+  let fightSfx = sfx.fight();
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);   // 「対」の叩きつけ
   setTimeout(() => {
     box.classList.add('go');
@@ -3033,14 +3035,14 @@ function showMatchup(a, b, then) {
       cutSfx(fightSfx); fightSfx = null;
       // 帯で勝負のはじまりを打ち、鳴り終わってから BGM を頭から掛ける
       sfx.intro();
-      setTimeout(startBgm, 780);        // 合図が鳴り終わってから頭で掛ける
+      setTimeout(() => startBgm(true), 730);   // 合図が切れた瞬間に頭から
       then();
       setTimeout(() => { box.classList.add('hidden'); box.classList.remove('go'); }, 340);
       return;
     }
     cutSfx(fightSfx); fightSfx = null;
     sfx.intro();
-    setTimeout(startBgm, 780);
+    setTimeout(() => startBgm(true), 730);
     box.classList.add('out');                    // 消えぎわを溶かす
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
   };
