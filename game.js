@@ -2909,23 +2909,38 @@ $('sel-gote').addEventListener('change',  () => { renderArmy('sel-gote','pieces-
 /* 開始前に、両者の編成を見せる */
 function showMatchup(a, b, then) {
   const box = $('matchup');
+  // 演出が明けたとき編成の画面が覗いていたので、下は全部畳んでおく
+  ['title','game','setup','deck','presets','brief','guide','tutorial']
+    .forEach(id => { const el = $(id); if (el) el.classList.add('hidden'); });
   const card = (side, d) => {
-    const abils = Object.keys(d.abilities || {}).map(id => {
+    const abils = Object.keys(d.abilities || {}).map((id, i) => {
       const x = ABI_BY_ID[id];
-      return `<span class="chip r${x.r}"><i>${RARITY[x.r]}</i>${x.n}</span>`;
+      return `<span class="chip r${x.r}" style="--i:${i}"><i>${RARITY[x.r]}</i>${x.n}</span>`;
     }).join('') || '<span class="ap-none">能力なし</span>';
-    const pieces = HAND_ORDER.filter(t => d.pool[t]).map(t =>
-      `<span class="ap"><b>${NAME[t]}</b>${d.pool[t] > 1 ? `<i>${d.pool[t]}</i>` : ''}</span>`).join('');
+    const pieces = HAND_ORDER.filter(t => d.pool[t]).map((t, i) =>
+      `<span class="ap" style="--i:${i}"><b>${NAME[t]}</b>${d.pool[t] > 1 ? `<i>${d.pool[t]}</i>` : ''}</span>`).join('');
     const val = Object.entries(d.pool).reduce((v, [t, n]) => v + VAL[t]*n, 0);
     return `<div class="mu-side"><p class="mu-name"><span>${side}</span>${d.name}</p>` +
            `<div class="mu-pieces">${pieces}</div>` +
-           `<p class="mu-val">${poolTotal(d.pool)}枚 / 価値 ${val.toLocaleString('ja-JP')}</p>` +
+           `<p class="mu-val">${poolTotal(d.pool)}枚 / 戦力 <b data-to="${val}">0</b></p>` +
            `<div class="mu-abils">${abils}</div></div>`;
   };
   box.innerHTML = `<div class="mu-round">ROUND ${match ? match.game : 1}</div>`
                 + card('▲ 先手', a) + '<div class="mu-vs"><b>対</b></div>' + card('△ 後手', b);
   box.classList.remove('hidden', 'out');
   box.classList.remove('go'); void box.offsetWidth;
+  // 戦力は数え上げる。止まった数字より、伸びる数字のほうが効く
+  box.querySelectorAll('.mu-val b').forEach((el, k) => {
+    const to = Number(el.dataset.to) || 0;
+    if (motionCalm) { el.textContent = to.toLocaleString('ja-JP'); return; }
+    const t0 = performance.now() + 220 + k * 140, dur = 620;
+    const tick = now => {
+      const p = Math.min(1, Math.max(0, (now - t0) / dur));
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString('ja-JP');
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる
   sfx.ui();
   setTimeout(() => { if (!motionCalm) { sfx.big(); shake(2.6); } }, 620);
@@ -2933,6 +2948,11 @@ function showMatchup(a, b, then) {
     box.classList.add('go');
     if (motionCalm) return;
     sfx.jackpot(); shake(1.8);
+    // 「対」が退いたあとに、開戦を叩き込む
+    const kick = document.createElement('div');
+    kick.className = 'mu-kick';
+    kick.textContent = '開　戦';
+    box.appendChild(kick);
     // 中央から輪が広がる。盤の ringBurst は演出の下に隠れるので、ここに置く
     for (let i = 0; i < 2; i++) {
       const r = document.createElement('div');
@@ -2951,7 +2971,7 @@ function showMatchup(a, b, then) {
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
   };
   box.addEventListener('click', go);
-  setTimeout(go, 2400);            // 触らなくても進む
+  setTimeout(go, 2750);            // 触らなくても進む
 }
 
 $('btn-setup-start').addEventListener('click', async () => {

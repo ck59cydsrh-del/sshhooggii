@@ -287,9 +287,23 @@ body{
 @keyframes muFade{to{opacity:0}}
 /* 「対」だけが残って大きくなる */
 #matchup.go .mu-vs b{animation:muHold .6s var(--jelly-soft) forwards}
-@keyframes muHold{to{transform:scale(1.9)}}
+@keyframes muHold{to{opacity:0;transform:scale(2.6)}}
 #matchup.go .mu-vs::before{animation:muFade .3s linear forwards}
 #matchup.go .mu-vs::after{animation:muFade .3s linear forwards}
+/* 「対」が退いた後に叩き込む一撃 */
+.mu-kick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-family:var(--mincho);font-size:44px;letter-spacing:.24em;color:var(--ink);
+  white-space:nowrap;pointer-events:none;
+  animation:muKick .8s cubic-bezier(.16,1.6,.3,1) .22s backwards}
+@keyframes muKick{
+  0%{opacity:0;transform:translate(-50%,10%) scale(.7) skewX(-14deg)}
+  26%{opacity:1;transform:translate(-50%,-50%) scale(1.12) skewX(0)}
+  40%{transform:translate(-50%,-50%) scale(1)}
+  78%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}
+}
+#matchup.go .mu-vs b{animation:muHold .5s var(--jelly-soft) forwards}
+
 /* 中央から広がる輪 */
 .mu-ring{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;
   border:2px solid var(--ink);border-radius:50%;pointer-events:none;
@@ -313,7 +327,15 @@ body{
   letter-spacing:.16em;border-bottom:1px solid var(--ink);padding-bottom:7px;margin-bottom:10px}
 .mu-name span{font-size:11px;letter-spacing:.2em;color:var(--g45)}
 .mu-pieces{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+/* 駒と能力は一つずつ置かれていく */
+.mu-pieces .ap{animation:muPop .34s var(--jelly) backwards;
+  animation-delay:calc(.22s + var(--i, 0) * .045s)}
+.mu-abils .chip{animation:muPop .34s var(--jelly) backwards;
+  animation-delay:calc(.4s + var(--i, 0) * .06s)}
+@keyframes muPop{from{opacity:0;transform:translateY(8px) scale(.86)}to{opacity:1;transform:none}}
 .mu-val{font-size:10px;letter-spacing:.12em;color:var(--g45);margin-bottom:9px}
+.mu-val b{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--ink);
+  font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .mu-abils{display:flex;flex-wrap:wrap;gap:6px 12px;min-height:14px}
 
 /* 中央の「対」。遅れて叩きつけ、余韻で脈打つ */
@@ -334,7 +356,8 @@ body{
 .mu-vs::after{left:calc(50% + 32px);animation-name:muLineR}
 @keyframes muLineL{from{width:0;opacity:0}to{width:calc(50% - 32px);opacity:1}}
 @keyframes muLineR{from{width:0;opacity:0}to{width:calc(50% - 32px);opacity:1}}
-body.calm .mu-side,body.calm .mu-vs b,body.calm .mu-round{animation:none}
+body.calm .mu-side,body.calm .mu-vs b,body.calm .mu-round,
+body.calm .mu-pieces .ap,body.calm .mu-abils .chip{animation:none}
 body.calm .mu-vs::before,body.calm .mu-vs::after{animation:none;width:calc(50% - 32px)}
 body.calm #matchup.go *{animation:none !important}
 
