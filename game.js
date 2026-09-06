@@ -2990,8 +2990,9 @@ function showMatchup(a, b, then) {
     box.querySelectorAll('.mu-kick, .mu-ring').forEach(e => e.remove());
     // 墨に落ちきっていれば、そのまま帯へ渡す(溶かすと紙が一瞬覗く)
     if (box.classList.contains('go')) {
-      then();                                   // 先に盤を組んでおく
-      box.classList.add('hidden'); box.classList.remove('go');
+      // 帯を先に走らせ、覆いきってから幕を落とす。先に落とすと紙が一瞬覗く
+      then();
+      setTimeout(() => { box.classList.add('hidden'); box.classList.remove('go'); }, 340);
       return;
     }
     box.classList.add('out');                    // 消えぎわを溶かす
@@ -3073,7 +3074,7 @@ $('btn-setup-start').addEventListener('click', async () => {
       const theirs = (meta && meta[foe]) || randomFoe();
       lastVersus = net.seat === SENTE ? { s:deck, g:theirs } : { s:theirs, g:deck };
       showMatchup(lastVersus.s, lastVersus.g,
-        () => { toGame(); startMatch(lastVersus.s, lastVersus.g, false); });
+        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, false); }, 'round'));
     });
     return;
   }
@@ -3082,12 +3083,12 @@ $('btn-setup-start').addEventListener('click', async () => {
     if (cpu) {
       lastVersus = { s:deckS, g:randomFoe() };
       return showMatchup(lastVersus.s, lastVersus.g,
-        () => { toGame(); startMatch(lastVersus.s, lastVersus.g, true); });
+        () => floorTransition(1, () => { toGame(); startMatch(lastVersus.s, lastVersus.g, true); }, 'round'));
     }
     openDeck(GOTE, srcG, deckG => {
       lastVersus = { s:deckS, g:deckG };
       showMatchup(deckS, deckG,
-        () => { toGame(); startMatch(deckS, deckG, false); });
+        () => floorTransition(1, () => { toGame(); startMatch(deckS, deckG, false); }, 'round'));
     });
   });
 });
