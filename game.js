@@ -1084,13 +1084,26 @@ function stopBgm() {
   bgmSrc = null; bgmGain = null;
 }
 /* FEVER中だけ少し前に出す */
+/* 場面のあいだだけ BGM を退かせる。止めると頭に戻ってしまうので、
+   音量だけを 0 へ落として、明けたら戻す。 */
+let bgmHushed = false;
+function hushBgm(on) {
+  bgmHushed = on;
+  if (!bgmGain) return;
+  const x = ac(); if (!x) return;
+  bgmGain.gain.cancelScheduledValues(x.currentTime);
+  bgmGain.gain.setValueAtTime(bgmGain.gain.value, x.currentTime);
+  bgmGain.gain.linearRampToValueAtTime(on ? 0 : volBgm, x.currentTime + (on ? 0.22 : 0.9));
+}
 function duckBgm(up) {
+  if (bgmHushed) return;
   if (!bgmGain) return;
   const x = ac();
   bgmGain.gain.cancelScheduledValues(x.currentTime);
   bgmGain.gain.linearRampToValueAtTime(up ? Math.min(1, volBgm * 1.35) : volBgm, x.currentTime + 0.25);
 }
 function applyBgmVolume() {
+  if (bgmHushed) return;
   if (!bgmGain) return;
   const x = ac();
   bgmGain.gain.cancelScheduledValues(x.currentTime);
@@ -1810,7 +1823,7 @@ function finish(winner, how) {
     if (how === 'king' && cheatDeath(other(winner))) return;
     // 勝負がつく局は決着の音、途中の局は区切りの音
     const w0 = match.wins;
-    (w0[winner] + 1 >= 2) ? sfx.decide() : sfx.clear();
+    if (w0[winner] + 1 >= 2) { hushBgm(true); sfx.decide(); } else sfx.clear();
     // 残機が削られる側の、いちばん右の点を砕いてから数える
     const loser = other(winner);
     const pips = [...document.querySelectorAll('.vl')]
@@ -1838,10 +1851,11 @@ function finish(winner, how) {
                   : mine ? '勝　利' : '敗　北';
       const body = (mine === null ? '' : `${mark} ${champ.name} の勝ち\n`)
                  + `${score}\n2本先取。相手の残機を削り切った。`;
+      const resume = f => () => { hushBgm(false); f(); };
       showOverlay(title, body, [
-        ['同じ組み合わせでもう一番', () => startMatch(match.s, match.g, match.cpu)],
-        ['編成を選び直す', openSetup],
-        ['タイトルへ', toTitle],
+        ['同じ組み合わせでもう一番', resume(() => startMatch(match.s, match.g, match.cpu))],
+        ['編成を選び直す', resume(openSetup)],
+        ['タイトルへ', resume(toTitle)],
       ], 'MATCH END', null, mine === null ? '' : (mine ? 'win' : 'lose'));
     } else {
       const won = seat === null ? null : winner === seat;
@@ -2335,6 +2349,7 @@ $('btn-brief-back').addEventListener('click', () => { sfx.ui(); toTitle(); });
 
 function toTitle() {
   gen++;
+  hushBgm(false);
   busy = false;
   $('btn-presets-back').classList.remove('danger');
   ['game','setup','presets','deck','tutorial','brief','guide'].forEach(id => $(id).classList.add('hidden'));
@@ -2968,7 +2983,8 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 入りの音は尺2.6秒あるので頭から流し、演出に重ねる
+  // 入りの音は尺2.6秒あるので頭から流し、演出に重ねる。BGMは退かせる
+  hushBgm(true);
   sfx.fight();
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);
   setTimeout(() => {
@@ -3001,10 +3017,12 @@ function showMatchup(a, b, then) {
       // 帯を先に走らせ、覆いきってから幕を落とす。先に落とすと紙が一瞬覗く
       then();
       setTimeout(() => { box.classList.add('hidden'); box.classList.remove('go'); }, 340);
+      setTimeout(() => hushBgm(false), 700);
       return;
     }
     box.classList.add('out');                    // 消えぎわを溶かす
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
+    setTimeout(() => hushBgm(false), 700);
   };
   box.addEventListener('click', go);
   setTimeout(go, 2900);            // 触らなくても進む
