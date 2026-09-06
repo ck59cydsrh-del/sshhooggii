@@ -761,6 +761,18 @@ function play(key, rate = 1, gain = 0.9) {
   g.gain.value = gain * volSfx;
   src.connect(g); g.connect(x.destination);
   src.start();
+  return { src, gain: g };                       // 途中で切りたい音のために返す
+}
+/* 鳴っている音を短く絞って止める */
+function cutSfx(h, ms = 90) {
+  if (!h) return;
+  const x = ac(); if (!x) return;
+  try {
+    h.gain.gain.cancelScheduledValues(x.currentTime);
+    h.gain.gain.setValueAtTime(h.gain.gain.value, x.currentTime);
+    h.gain.gain.linearRampToValueAtTime(0, x.currentTime + ms / 1000);
+    h.src.stop(x.currentTime + ms / 1000 + 0.03);
+  } catch (e) {}
 }
 const sfx = {
   move:  () => play('move', 0.95 + Math.random()*0.1, 0.8),
@@ -784,7 +796,7 @@ const sfx = {
   collapse:() => play('crumble', 1, 0.7),         // 崩壊の足音
   ability:r => play('spark', r === 3 ? 0.86 : r === 2 ? 1 : 1.14, r === 3 ? 1 : 0.8),
   big:   () => play('impact', 0.9, 0.9),          // 大駒を取った
-  fight: () => play('fight', 1, 1),               // 対戦の入り(尺2.6秒。演出に重ねる)
+  fight: () => play('fight', 1, 1),               // FIGHT の瞬間。帯で切る
   decide:() => play('decide', 1, 1),              // 決着
 };
 
@@ -2983,12 +2995,13 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 入りの音は尺2.6秒あるので頭から流し、演出に重ねる。BGMは退かせる
+  // 入りのあいだ BGM は退かせる。音は FIGHT の瞬間に置く
   hushBgm(true);
-  sfx.fight();
+  let fightSfx = null;
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);
   setTimeout(() => {
     box.classList.add('go');
+    fightSfx = sfx.fight();                      // FIGHT と同時に打つ
     if (motionCalm) return;
     shake(1.8);
     // 「対」が退いたあとに、開戦を叩き込む
@@ -3015,14 +3028,16 @@ function showMatchup(a, b, then) {
     // 墨に落ちきっていれば、そのまま帯へ渡す(溶かすと紙が一瞬覗く)
     if (box.classList.contains('go')) {
       // 帯を先に走らせ、覆いきってから幕を落とす。先に落とすと紙が一瞬覗く
+      cutSfx(fightSfx); fightSfx = null;         // 入りの音は帯で断つ
+      hushBgm(false);                            // BGM は帯から戻す
       then();
       setTimeout(() => { box.classList.add('hidden'); box.classList.remove('go'); }, 340);
-      setTimeout(() => hushBgm(false), 700);
       return;
     }
+    cutSfx(fightSfx); fightSfx = null;
+    hushBgm(false);
     box.classList.add('out');                    // 消えぎわを溶かす
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
-    setTimeout(() => hushBgm(false), 700);
   };
   box.addEventListener('click', go);
   setTimeout(go, 2900);            // 触らなくても進む
