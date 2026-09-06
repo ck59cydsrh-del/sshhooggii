@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788664816">
+<link rel="stylesheet" href="style.css?v=1788666186">
 </head>
 <body>
 <div id="crt"></div>
@@ -333,6 +333,13 @@
     <p class="modal-q">設定</p>
 
     <div class="set-row">
+      <label for="opt-sound">音</label>
+      <select id="opt-sound">
+        <option value="on">鳴らす</option>
+        <option value="off">消す</option>
+      </select>
+    </div>
+    <div class="set-row">
       <label for="vol-bgm">BGM</label>
       <input id="vol-bgm" type="range" min="0" max="100" step="1" value="50">
       <b id="vol-bgm-v">50</b>
@@ -350,7 +357,7 @@
       </select>
     </div>
 
-    <p class="set-note">初期設定 — BGM 50 / 効果音 90 / 演出 通常</p>
+    <p class="set-note">初期設定 — 音 鳴らす / BGM 50 / 効果音 90 / 演出 通常</p>
 
     <div class="modal-actions">
       <button id="settings-reset" class="btn ghost"><b>初期設定に戻す</b><i>reset</i></button>
@@ -370,6 +377,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788664816"></script>
+<script src="game.js?v=1788666186"></script>
 </body>
 </html>

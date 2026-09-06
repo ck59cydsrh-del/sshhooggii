@@ -3227,6 +3227,7 @@ function openSettings() {
   $('vol-bgm-v').textContent = Math.round(volBgm * 100);
   $('vol-sfx-v').textContent = Math.round(volSfx * 100);
   $('opt-motion').value = motionCalm ? 'calm' : 'full';
+  $('opt-sound').value = soundOn ? 'on' : 'off';
   $('settings').classList.remove('hidden');
   loadSfx();
 }
@@ -3257,7 +3258,7 @@ $('settings-reset').addEventListener('click', () => {
   saveOpt('komagari.motion', 'full');
   document.body.classList.remove('calm');
   applyBgmVolume();
-  if (!soundOn) { soundOn = true; saveOpt('komagari.sound', '1'); $('btn-sound').classList.add('on'); loadSfx(); startBgm(); }
+  setSound(true, true);
   openSettings();
   sfx.ui();
 });
@@ -3276,13 +3277,24 @@ $('btn-quit').addEventListener('click', () => {
     ['タイトルへ', toTitle],
   ], 'ABORT?');
 });
-$('btn-sound').addEventListener('click', () => {
-  soundOn = !soundOn;
-  try { localStorage.setItem('komagari.sound', soundOn ? '1' : '0'); } catch (e) {}
-  $('btn-sound').classList.toggle('on', soundOn);
-  if (soundOn) { loadSfx(); startBgm(); } else stopBgm();
-});
-$('btn-sound').classList.toggle('on', soundOn);
+/* 音のオン/オフはHUDと設定の両方から触れる。切れていることが
+   見た目で分かるようにする(以前は他のボタンと同じ灰色で区別できず、
+   誤って切ったことに気づけなかった) */
+function setSound(on, quiet) {
+  soundOn = on;
+  try { localStorage.setItem('komagari.sound', on ? '1' : '0'); } catch (e) {}
+  const b = $('btn-sound');
+  b.classList.toggle('on', on);
+  b.classList.toggle('muted', !on);
+  b.textContent = on ? '♪' : '♪ ×';
+  b.title = on ? '音を消す' : '音を鳴らす';
+  const sel = $('opt-sound'); if (sel) sel.value = on ? 'on' : 'off';
+  if (on) { loadSfx(); startBgm(); } else stopBgm();
+  if (!quiet) setLog(on ? '音を鳴らします。' : '音を消しました。もう一度 ♪ で戻せます。');
+}
+$('btn-sound').addEventListener('click', () => setSound(!soundOn));
+$('opt-sound').addEventListener('change', e => { setSound(e.target.value === 'on', true); sfx.ui(); });
+setSound(soundOn, true);
 primeAudio();
 showBest();
 renderPieceGuide();

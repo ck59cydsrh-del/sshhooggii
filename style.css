@@ -210,6 +210,9 @@ body{
 .icon-btn{color:var(--g45)}
 .icon-btn.on{color:var(--ink);border-bottom-color:var(--ink)}
 .icon-btn.wide{font-size:10px;letter-spacing:.1em;padding:0 4px}
+/* 音が切れていることを、ほかのボタンと見分けがつく形で出す */
+.icon-btn.muted{color:var(--ink);font-size:9px;letter-spacing:.02em;
+  border-bottom-color:var(--ink);background:var(--g12)}
 .icon-btn{transition:transform .1s var(--jelly-soft)}
 .icon-btn:active{transform:scale(.85,1.15);opacity:.6}
 
@@ -429,7 +432,7 @@ body.calm .preset-body{animation:none}
 #turn-label.close{color:var(--ink);background:var(--glow);padding:2px 6px;margin-left:-6px}
 .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 /* ボタンを縦に積むとHUDだけで163pxを使い、盤が小さくなっていた */
-.hud-btns{display:flex;align-items:center;gap:4px}
+.hud-btns{display:flex;align-items:center;gap:9px}
 .score{
   font-family:var(--sans);font-size:17px;font-weight:400;letter-spacing:.06em;
   color:var(--ink);line-height:1;font-variant-numeric:tabular-nums;
