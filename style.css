@@ -182,7 +182,7 @@ body{
 @media (hover:hover){ .mi:hover{padding-left:10px} }
 .mi:active{opacity:.55}
 .mi.jelly{animation:jelly .42s var(--jelly)}
-.mi-no{font-size:10px;letter-spacing:.16em;color:var(--g26);flex:none;padding-top:2px}
+.mi-no{font-size:10px;letter-spacing:.16em;color:var(--g45);flex:none;padding-top:2px}
 .mi-body{display:flex;flex-direction:column;gap:5px;flex:none}
 .mi b{font-family:var(--mincho);font-size:20px;letter-spacing:.28em;font-weight:400;line-height:1}
 .mi-sub{font-size:9.5px;letter-spacing:.08em;color:var(--g45);line-height:1.5}
@@ -472,7 +472,7 @@ body.calm #matchup{transition:none}
 @media (hover:hover){ .preset:hover{padding-left:8px} }
 .preset:active{transform:scale(.995,1.03)}
 .preset.jelly{animation:jelly .4s var(--jelly)}
-.preset.empty{color:var(--g26);cursor:default}
+.preset.empty{color:var(--g45);cursor:default}
 .preset.empty:active{transform:none}
 .preset.confirm .pslot,.preset.confirm .pmain b{color:var(--green)}
 .preset.just-saved .pslot{color:var(--green)}
@@ -586,7 +586,7 @@ body.calm .tray-label.grew b{animation:none}
 .tray-enemy{margin-bottom:16px}
 .hand-item{display:flex;align-items:flex-end;gap:2px;padding:6px 2px;margin:-6px 0}
 .hand-count{font-size:10px;color:var(--g70);padding-bottom:2px;letter-spacing:.04em}
-.tray-empty{font-size:10px;letter-spacing:.22em;color:var(--g26)}
+.tray-empty{font-size:10px;letter-spacing:.22em;color:var(--g45)}
 
 /* ---------- 盤 ---------- */
 .board-frame{display:flex;flex-direction:column;gap:9px}
@@ -1031,7 +1031,7 @@ body.calm .ob-line{opacity:1;animation:none}
 .army{border-top:1px solid var(--ink);padding:12px 0 14px}
 .army-head{display:flex;align-items:center;gap:12px 10px;margin-bottom:10px;flex-wrap:wrap}
 .army-side{font-family:var(--mincho);font-size:15px;letter-spacing:.22em;flex:none;min-width:74px}
-.army-head select{flex:1;font-family:var(--sans);font-size:11px;padding:7px 0;border-radius:0;
+.army-head select{flex:1;font-family:var(--sans);font-size:11px;padding:11px 0;min-height:40px;border-radius:0;
   background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);letter-spacing:.04em}
 .army-pieces{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:9px}
 .ap{display:inline-flex;align-items:baseline;gap:2px;border:1px solid var(--g26);padding:2px 6px}
@@ -1047,12 +1047,12 @@ body.calm .ob-line{opacity:1;animation:none}
 
 /* デッキ構築の補助 */
 .deck-quick{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.mini{font-family:var(--sans);font-size:10px;letter-spacing:.1em;cursor:pointer;min-height:34px;
+.mini{font-family:var(--sans);font-size:10px;letter-spacing:.1em;cursor:pointer;min-height:40px;
   background:transparent;border:1px solid var(--g26);color:var(--g70);padding:6px 12px}
 .mini:active{opacity:.5}
 .deck-value{font-size:9.5px;letter-spacing:.12em;color:var(--g45);margin-left:auto}
 .deck-filter{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
-.fchip{font-family:var(--sans);font-size:10px;letter-spacing:.12em;cursor:pointer;min-height:32px;
+.fchip{font-family:var(--sans);font-size:10px;letter-spacing:.12em;cursor:pointer;min-height:40px;
   background:transparent;border:1px solid var(--g12);color:var(--g45);padding:5px 11px}
 .fchip.on{border-color:var(--ink);color:var(--ink)}
 .fchip:active{opacity:.5}
@@ -1070,7 +1070,7 @@ body.calm .ob-line{opacity:1;animation:none}
 .dp-name{font-family:var(--mincho);font-size:14px;letter-spacing:.2em;min-width:2.4em}
 .dp-count{flex:1;font-size:11px;letter-spacing:.1em;color:var(--g70)}
 .dp-count i{font-style:normal;color:var(--g26)}
-.dp-btn{font-family:var(--sans);font-size:15px;line-height:1;width:40px;height:36px;cursor:pointer;
+.dp-btn{font-family:var(--sans);font-size:15px;line-height:1;width:44px;height:40px;cursor:pointer;
   background:transparent;border:1px solid var(--g12);color:var(--ink)}
 .dp-btn{transition:transform .1s var(--jelly-soft)}
 .dp-btn:active{transform:scale(.82,1.18);opacity:.55}
@@ -1279,20 +1279,6 @@ body.calm .pc.flyer{display:none}
 .pb-rename label{font-size:9.5px;letter-spacing:.16em;color:var(--g45);flex:none}
 .pb-rename input{flex:1;min-width:0;font-family:var(--mincho);font-size:13px;letter-spacing:.12em;
   background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);
-  padding:5px 2px;border-radius:0}
+  padding:11px 2px;min-height:40px;border-radius:0}
 .pb-rename input:focus{outline:none;border-bottom-color:var(--green)}
 .pb-rename .mini{flex:none}
-
-/* 連鎖が切れる寸前。あと一手で消える、が目に入る */
-.charge.urgent{color:var(--ink)}
-.charge.urgent i b{background:var(--green)}
-@keyframes chargeUrge{0%,100%{opacity:1}50%{opacity:.35}}
-.charge.urgent i b:not(.off){animation:chargeUrge .55s steps(2,end) infinite}
-body.calm .charge.urgent i b:not(.off){animation:none}
-
-/* 階に降り立つ瞬間、盤が下から入る */
-@keyframes floorDrop{from{opacity:.35;transform:translateY(-16px)}to{opacity:1;transform:none}}
-#game.dropped .board-frame{animation:floorDrop .4s var(--jelly-soft)}
-body.calm #game.dropped .board-frame{animation:none}
-.score-chase{font-size:8.5px;letter-spacing:.1em;color:var(--green);line-height:1;
-  min-height:9px;display:block;text-align:right}
