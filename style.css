@@ -479,7 +479,13 @@ body.calm .preset-body{animation:none}
 
 /* ---------- 持ち駒 ---------- */
 .tray{display:flex;align-items:center;gap:14px;min-height:48px}
-.tray-label{font-family:var(--mincho);font-size:12px;letter-spacing:.2em;color:var(--g70);min-width:18px}
+.tray-label{font-family:var(--mincho);font-size:12px;letter-spacing:.2em;color:var(--g70);
+  min-width:18px;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1}
+.tray-label b{font-family:var(--sans);font-size:9.5px;font-weight:400;letter-spacing:.02em;color:var(--g45)}
+.tray-self .tray-label b{color:var(--ink)}
+@keyframes trayGrew{0%{transform:scale(1)}40%{transform:scale(1.45);color:var(--green)}100%{transform:scale(1)}}
+.tray-label.grew b{animation:trayGrew .38s var(--jelly)}
+body.calm .tray-label.grew b{animation:none}
 .tray-row{display:flex;flex-wrap:wrap;gap:5px;flex:1;align-items:center}
 .tray-self{margin-top:18px}
 .tray-enemy{margin-bottom:16px}
@@ -666,6 +672,12 @@ body.flipped .pc:not(.gote).hand:active{transform:rotate(180deg) scale(.86,1.16)
   font-family:var(--sans);font-size:26px;font-weight:400;letter-spacing:.02em;
   line-height:1.1;display:block;color:var(--ink);font-variant-numeric:tabular-nums;
 }
+.combo-gauge{display:flex;gap:2px;justify-content:flex-end;margin-top:4px}
+.combo-gauge i{width:8px;height:4px;background:var(--g12);display:block}
+.combo-gauge i.on{background:var(--green)}
+.combo.hot .combo-gauge i.on{background:var(--glow)}
+.combo-to{font-size:8px;letter-spacing:.14em;color:var(--g45);display:block;margin-top:3px}
+.combo.hot .combo-to{color:var(--ink);background:var(--glow);padding:1px 4px}
 .combo.bump{animation:combobump .1s steps(2,end)}
 @keyframes combobump{50%{opacity:.3}}
 
@@ -798,7 +810,12 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 #overlay-title{font-family:var(--didone);font-size:28px;letter-spacing:.16em;
   margin-bottom:18px;line-height:1.35;font-weight:400}
 #overlay-body{font-size:10.5px;line-height:2.15;color:var(--g70);margin-bottom:26px;
-  white-space:pre-line;letter-spacing:.08em}
+  letter-spacing:.08em}
+/* 結果は一行ずつ立ち上げる。数え上げている感じを出す */
+@keyframes obIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.ob-line{display:block;min-height:1.2em;opacity:0;
+  animation:obIn .26s var(--jelly-soft) forwards;animation-delay:calc(var(--i) * .13s + .12s)}
+body.calm .ob-line{opacity:1;animation:none}
 #overlay-actions{display:flex;flex-direction:column;gap:0;border-bottom:1px solid var(--g12)}
 
 .rank{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
@@ -1141,7 +1158,3 @@ body.calm .cell.in-danger{animation:none;box-shadow:inset 0 0 0 3px var(--ink)}
 .cell.in-reach{box-shadow:inset 0 0 0 2px var(--green)}
 .stamp.danger{font-family:var(--mincho);font-size:30px;letter-spacing:.18em;color:var(--ink)}
 
-/* 指すと玉が取られる行き先。反則にはせず、印を弱めるだけ。
-   王手のときは危ない手が大半になるので、斜線だと画面が埋まって読めない */
-.cell.risky.move::after{opacity:.22;width:16%}
-.cell.risky.capture{box-shadow:inset 0 0 0 1px var(--g26)}

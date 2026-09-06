@@ -552,7 +552,6 @@ const SLOTS = 5;
 
 let pos = null, mode = 'solo', run = null;
 let sel = null, legal = [], busy = false, pendingPromo = null;
-let risky = [];        // 選んだ駒の行き先のうち、指すと玉が取られるマス
 let goteIsCPU = true;
 let floorState = null;   // 階ごとの使い切り
 let soundOn = localStorage.getItem('komagari.sound') !== '0';
@@ -1015,6 +1014,19 @@ function showCombo(n) {
   const el = $('combo');
   if (n < 2) { el.classList.add('hidden'); return; }
   $('combo-n').textContent = '×' + n;
+  // FEVERまであと何連鎖かを目盛りで見せる。溜まるのが見えると繋ぎたくなる
+  const g = $('combo-gauge');
+  if (g) {
+    g.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+      const b = document.createElement('i');
+      if (i < Math.min(n, 5)) b.className = 'on';
+      g.appendChild(b);
+    }
+  }
+  const to = $('combo-to');
+  if (to) to.textContent = n >= 5 ? 'FEVER' : `あと${5 - n}で FEVER`;
+  el.classList.toggle('hot', n >= 5);
   el.classList.remove('hidden');
   el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
 }
@@ -1266,7 +1278,6 @@ function render() {
     else if (inZone(rowOf(i), foe)) cell.classList.add('zone', 'zone-foe');
     if (legal.includes(i)) {
       cell.classList.add('clickable', pos.b[i] ? 'capture' : 'move');
-      if (risky.includes(i)) cell.classList.add('risky');   // 指すと玉が取られる
     }
     if (sel && sel.kind === 'board' && sel.idx === i) cell.classList.add('sel');
     const p = pos.b[i];
@@ -1282,8 +1293,16 @@ function render() {
   // 手前が自分、奥が相手になるようトレイも入れ替える
   const meTray = flipped() ? 'g' : 's', foeTray = flipped() ? 's' : 'g';
   renderHand(meTray, 'hand-s'); renderHand(foeTray, 'hand-g');
-  document.querySelector('.tray-self .tray-label').textContent = '自';
-  document.querySelector('.tray-enemy .tray-label').textContent = '敵';
+  // 持ち駒の枚数を出す。奪った駒が積み上がっていくのが数で見える
+  const count = side => Object.values(pos.h[side] || {}).reduce((a, b) => a + b, 0);
+  const selfN = count(meTray), foeN = count(foeTray);
+  document.querySelector('.tray-self .tray-label').innerHTML = `自<b>${selfN}</b>`;
+  document.querySelector('.tray-enemy .tray-label').innerHTML = `敵<b>${foeN}</b>`;
+  const selfLab = document.querySelector('.tray-self .tray-label');
+  if (selfLab && selfN > (renderHand.lastSelf || 0)) {
+    selfLab.classList.remove('grew'); void selfLab.offsetWidth; selfLab.classList.add('grew');
+  }
+  renderHand.lastSelf = selfN;
   renderAbilityBar(); renderCharges(); renderClock();
   fitBoard();
 
@@ -1466,27 +1485,12 @@ const setLog = t => { $('log').textContent = t; };
 /* ============================================================
    入力
    ============================================================ */
-/* 指した後に玉が取られる手を先に洗い出す。将棋の反則にはせず、
-   印を出すだけに留める(玉を取る/取られるがこの遊びの中心なので、
-   合法手を狭めると斬首や影武者の意味が消える) */
-function markRisky(mvs) {
-  risky = [];
-  if (!humanControls(pos.turn)) return;
-  const me = pos.turn;
-  for (const m of mvs) {
-    const u = make(pos, m);
-    const bad = inCheck(pos, me);
-    unmake(pos, m, u);
-    if (bad) risky.push(m.to);
-  }
-}
 function onHand(t, owner) {
   if (busy) return;
-  if (sel && sel.kind === 'hand' && sel.t === t) { sel = null; legal = []; risky = []; render(); return; }
+  if (sel && sel.kind === 'hand' && sel.t === t) { sel = null; legal = []; render(); return; }
   sel = { kind:'hand', t, owner };
   legal = [];
   for (let i = 0; i < NS; i++) if (canDropAt(pos, t, owner, i)) legal.push(i);
-  markRisky(legal.map(i => ({ drop:t, to:i })));
   render();
 }
 function onCell(i) {
@@ -1501,8 +1505,7 @@ function onCell(i) {
   const p = pos.b[i];
   if (p && p.o === pos.turn) {
     sel = { kind:'board', idx:i }; legal = targets(pos, i);
-    markRisky(legal.map(to => ({ from:i, to, pr:false })));
-  } else { sel = null; legal = []; risky = []; }
+  } else { sel = null; legal = []; }
   render();
 }
 $('promo-yes').addEventListener('click', () => { $('promo').classList.add('hidden'); applyMove({ ...pendingPromo, pr:true }); });
@@ -1548,7 +1551,7 @@ function applyMove(mv, fromNet) {
   const captured = mv.drop ? null : pos.b[mv.to];
   const attacker = mv.drop ? null : { t: pos.b[mv.from].t, pr: pos.b[mv.from].pr };
   make(pos, mv);
-  sel = null; legal = []; risky = [];
+  sel = null; legal = [];
   floorState.moves++;
   if (floorState.played) floorState.played[mover]++;
   const landed = mv.to;
@@ -1690,6 +1693,10 @@ function maybeCpuMove() {
   if (!cpuTurn) return;
   busy = true; render();
   const myGen = gen;
+  // 大きく決まった直後は、少し間を置いてから相手が指す。
+  // 決まった手ごたえが流れないようにするための余韻
+  const beat = (mode === 'solo' && floorState && floorState.combo >= 5) ? 460
+             : (mode === 'solo' && floorState && floorState.combo >= 3) ? 340 : 240;
   setTimeout(() => {
     if (myGen !== gen) return;            // 別の局面に移っていたら破棄
     const best = chooseMove(pos);
@@ -1697,7 +1704,7 @@ function maybeCpuMove() {
     busy = false;
     if (!best) return finish(other(pos.turn), 'stall');
     applyMove(best);
-  }, 240);
+  }, beat);
 }
 
 /* 守備隊の残り(盤上+持ち駒、玉を除く)。0になれば階は突破 */
@@ -2199,7 +2206,8 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '
     $('rank-letter').textContent = rank;
   } else rk.classList.add('hidden');
   $('overlay-title').textContent = title;
-  $('overlay-body').textContent = body;
+  $('overlay-body').innerHTML = String(body).split('\n')
+    .map((l, i) => `<span class="ob-line" style="--i:${i}">${l}</span>`).join('');
   const box = $('overlay-actions');
   box.innerHTML = '';
   actions.forEach(([label, fn, sub], i) => {
