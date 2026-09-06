@@ -616,6 +616,13 @@ function startFloor() {
     : `${run.floor}階。稼いだ駒を打ち込め。`);
   render();
   income.forEach(([id, detail], i) => setTimeout(() => announce(id, detail), 160 * i));
+
+  // 自己最高を超えた階に入った瞬間。ここから先は全部が初めての景色
+  const deepest = Number(localStorage.getItem(BEST_KEY) || 0);
+  if (deepest > 0 && run.floor > deepest && !run.shownDeep) {
+    run.shownDeep = true;
+    setTimeout(() => { stamp('未踏 ' + run.floor + '階', 'best'); flashScreen('hard'); sfx.power(2); }, 420);
+  }
 }
 
 /* 対戦は2本先取。局ごとに先番を入れ替えて先手の利を分ける */
@@ -747,7 +754,7 @@ function shake(power = 1) {
   w.classList.remove('shaking'); void w.offsetWidth; w.classList.add('shaking');
 }
 function popText(idx, text, cls = '') {
-  const cell = $('board').children[idx];
+  const cell = $('board').children[boardToView(idx)];
   if (!cell) return;
   const b = $('board').getBoundingClientRect(), c = cell.getBoundingClientRect();
   const el = document.createElement('div');
@@ -759,7 +766,7 @@ function popText(idx, text, cls = '') {
   setTimeout(() => el.remove(), 1100);
 }
 function burst(idx) {
-  const cell = $('board').children[idx];
+  const cell = $('board').children[boardToView(idx)];
   if (!cell) return;
   const b = $('board').getBoundingClientRect(), c = cell.getBoundingClientRect();
   const x = c.left - b.left + c.width/2, y = c.top - b.top + c.height/2;
@@ -774,6 +781,34 @@ function burst(idx) {
     setTimeout(() => s.remove(), 700);
   }
 }
+let pendingFly = null;      // 取った駒を、描き直したあとで駒台へ飛ばす
+/* 描き直してから、取った駒を駒台へ飛ばす。突破や詰みで抜けるときも通る */
+function repaint() {
+  render();
+  if (pendingFly) { flyToHand(pendingFly.idx, pendingFly.t, pendingFly.o); pendingFly = null; }
+}
+/* 取った駒が駒台へ飛ぶ。奪った駒がそのまま自分の戦力になることが
+   この遊びの芯なので、盤から手元へ移る瞬間を目で追えるようにする。 */
+function flyToHand(idx, t, owner) {
+  if (motionCalm) return;
+  const cell = $('board').children[boardToView(idx)];
+  const tray = $(owner === myView() ? 'hand-s' : 'hand-g');
+  if (!cell || !tray) return;
+  const c = cell.getBoundingClientRect(), r = tray.getBoundingClientRect();
+  const el = pieceEl({ t, o:owner, pr:false }, 'flyer');
+  el.style.left = c.left + 'px';  el.style.top = c.top + 'px';
+  el.style.width = c.width + 'px'; el.style.height = c.height + 'px';
+  document.body.appendChild(el);
+  const dx = (r.left + Math.min(r.width * 0.5, 54)) - (c.left + c.width / 2);
+  const dy = (r.top + r.height / 2) - (c.top + c.height / 2);
+  requestAnimationFrame(() => {
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(.5)`;
+    el.style.opacity = '.1';
+  });
+  setTimeout(() => el.remove(), 480);
+  tray.classList.remove('gained'); void tray.offsetWidth; tray.classList.add('gained');
+}
+
 /* 能力が発動したら名前と効果を大きく出す。連続発動は積んで見せる */
 function announce(id, detail) {
   const a = ABI_BY_ID[id];
@@ -1082,6 +1117,7 @@ function myView() {
 const flipped = () => myView() === GOTE;
 /* 画面の並び順 d ↔ 盤の位置 i */
 const viewToBoard = d => (flipped() ? NS - 1 - d : d);
+const boardToView = i => (flipped() ? NS - 1 - i : i);   // 演出をどのセルに出すか
 
 function render() {
   renderAxis();
@@ -1330,11 +1366,8 @@ function applyMove(mv, fromNet) {
     } else sfx.take(1);
 
     // 何が取られたかを対戦でもはっきり示す
-    if (mode === 'versus') {
-      captureBanner(mover, captured);
-      const tray = $(mover === SENTE ? 'hand-s' : 'hand-g');
-      tray.classList.remove('gained'); void tray.offsetWidth; tray.classList.add('gained');
-    }
+    if (mode === 'versus') captureBanner(mover, captured);
+    pendingFly = { idx: mv.to, t: captured.t, o: mover };
     burst(mv.to); shake(captured.t === 'R' || captured.t === 'B' ? 1.6 : 1);
     if (ab(mover,'duplicate')) { msg += ' 複製!'; announce('duplicate', `${NAME[captured.t]}が2枚になった`); }
     if (ab(mover,'promoteChain') && promoteOne(mover)) { msg += ' 昇格伝染!'; announce('promoteChain'); }
@@ -1358,7 +1391,7 @@ function applyMove(mv, fromNet) {
   }
   if (captured && captured.t === 'K') {
     sfx.heavy(); flashScreen(); shake(2.6);
-    setLog(msg + '  玉を取った'); render(); return finish(mover, 'king');
+    setLog(msg + '  玉を取った'); repaint(); return finish(mover, 'king');
   }
 
   if (mode === 'solo' && captured && garrisonLeft(pos) === 1 && !floorState.lastCalled) {
@@ -1369,7 +1402,7 @@ function applyMove(mv, fromNet) {
   // 守備隊を狩り尽くしたら突破(玉だけが残った状態)
   if (mode === 'solo' && captured && garrisonLeft(pos) === 0) {
     setLog(msg + '  守備隊は全滅した');
-    render();
+    repaint();
     return finish(SENTE, 'strip');
   }
 
@@ -1394,9 +1427,9 @@ function applyMove(mv, fromNet) {
     }
   }
   setLog(msg);
-  render();
+  repaint();
   if (!motionCalm) {
-    const cell = $('board').children[landed];
+    const cell = $('board').children[boardToView(landed)];
     const pcEl = cell && cell.querySelector('.pc');
     if (pcEl) { pcEl.classList.add('placed'); setTimeout(() => pcEl.classList.remove('placed'), 460); }
   }
@@ -1573,10 +1606,14 @@ function finish(winner, how) {
   const body = `手駒 ${before} → ${after}    +${clearScore.toLocaleString('ja-JP')}点`
     + (bonus.length ? '\n' + bonus.join('   ') : '');
   const rank = clearRank(floorState.budget ? spare / floorState.budget : 0, floorState.bestChain || run.comboBest);
+  // 撤退の誘惑を数字で見せる。「もう一階だけ」との天秤がこの遊びの芯
+  const abN = Object.values(run.abilities).reduce((a, b) => a + b, 0);
+  const carry = `駒${after}枚 / 能力${abN}個 / ${run.score.toLocaleString('ja-JP')}点を持ち帰る`;
   showOverlay(`${run.floor}階 突破`, body, [
     ['能力を選ぶ', () => openDraft(() => { run.floor++; floorTransition(run.floor, startFloor); },
-        'CLEAR ' + String(run.floor).padStart(2, '0'), `${run.floor}階の戦利`)],
-    ['撤退して編成を保存', () => openPresets('save')],
+        'CLEAR ' + String(run.floor).padStart(2, '0'), `${run.floor}階の戦利`),
+      `${run.floor + 1}階へ。倒れれば全部失う`],
+    ['撤退して編成を保存', () => openPresets('save'), carry],
   ], 'CLEAR ' + String(run.floor).padStart(2, '0'), rank);
 }
 
@@ -1833,10 +1870,10 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null) {
   $('overlay-body').textContent = body;
   const box = $('overlay-actions');
   box.innerHTML = '';
-  actions.forEach(([label, fn], i) => {
+  actions.forEach(([label, fn, sub], i) => {
     const b = document.createElement('button');
     b.className = 'btn' + (i === 0 ? ' primary' : '');
-    b.textContent = label;
+    b.innerHTML = `<span>${label}</span>` + (sub ? `<i class="btn-sub">${sub}</i>` : '');
     b.addEventListener('click', fn);
     box.appendChild(b);
   });
@@ -1844,16 +1881,72 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null) {
 }
 const hideOverlay = () => $('overlay').classList.add('hidden');
 
+/* 出撃前の説明。潜行は「集めたものを賭ける」遊びなので、
+   何が増えて何を失うのかを毎回きちんと言ってから始める。 */
+const BRIEF = {
+  dive: {
+    tag: 'DIVE', title: '潜　る',
+    lead: '集めた駒と能力を持ち帰って、対戦の編成にする。',
+    lines: [
+      ['増', '階を抜けるたび、敵の駒がまるごと手に入り、能力をひとつ選べる'],
+      ['失', '討ち死にすると、その潜行で集めたものは<b>すべて消える</b>'],
+      ['持', '突破のたびに撤退できる。撤退すれば、そのときの編成を<b>持ち帰れる</b>'],
+    ],
+    go: '潜行開始', goSub: '第1階へ降りる',
+  },
+  versus: {
+    tag: 'VERSUS', title: '対　戦',
+    lead: '編成を組んで、先に2勝した方が勝ち。',
+    lines: [
+      ['駒', '盤に出せるのは<b>10枚</b>。局ごとに先番が入れ替わる'],
+      ['安', '持ち帰った編成は能力が<b>安い</b>(並1 / 希2 / 極5)。ただし修得したものだけ'],
+      ['広', '既定編成は駒が固定。能力は<b>全種</b>から選べるが値は張る(並2 / 希4 / 極10)'],
+    ],
+    go: '編成を選ぶ', goSub: 'だれと → どの編成で → 駒 → 能力',
+  },
+};
+let briefThen = null;
+function openBrief(kind, then) {
+  const b = BRIEF[kind];
+  briefThen = then;
+  ['title','game','setup','deck','presets','tutorial'].forEach(id => $(id).classList.add('hidden'));
+  $('brief').classList.remove('hidden');
+  $('brief-tag').textContent = b.tag;
+  $('brief-title').textContent = b.title;
+  $('brief-lead').textContent = b.lead;
+  $('btn-brief-go').querySelector('b').textContent = b.go;
+  $('brief-go-sub').textContent = b.goSub;
+
+  const box = $('brief-lines');
+  box.innerHTML = '';
+  b.lines.forEach(([mark, text], i) => {
+    const row = document.createElement('div');
+    row.className = 'brief-line' + (mark === '失' ? ' warn' : '');
+    row.innerHTML = `<span class="bl-mark">${mark}</span><span class="bl-text">${text}</span>`;
+    if (!motionCalm) row.style.animationDelay = (60 + i * 90) + 'ms';
+    box.appendChild(row);
+  });
+
+  const saved = loadPresets().filter(Boolean);
+  const floor = Number(localStorage.getItem(BEST_KEY) || 0);
+  $('brief-stat').textContent = kind === 'dive'
+    ? (floor ? `最高到達 ${floor}階   ` : '') + `編成の空き枠 ${SLOTS - saved.length} / ${SLOTS}`
+    : saved.length ? `持ち帰った編成 ${saved.length} / ${SLOTS}`
+                   : 'まだ持ち帰りがないので、いまは既定編成だけで戦えます';
+}
+$('btn-brief-go').addEventListener('click', () => { sfx.ui(); const f = briefThen; briefThen = null; if (f) f(); });
+$('btn-brief-back').addEventListener('click', () => { sfx.ui(); toTitle(); });
+
 function toTitle() {
   gen++;
   busy = false;
   $('btn-presets-back').classList.remove('danger');
-  ['game','setup','presets','deck','tutorial'].forEach(id => $(id).classList.add('hidden'));
+  ['game','setup','presets','deck','tutorial','brief'].forEach(id => $(id).classList.add('hidden'));
   $('title').classList.remove('hidden');
   showBest();
 }
 function toGame() {
-  ['title','setup','presets','deck','tutorial'].forEach(id => $(id).classList.add('hidden'));
+  ['title','setup','presets','deck','tutorial','brief'].forEach(id => $(id).classList.add('hidden'));
   $('game').classList.remove('hidden');
 }
 function showBest() {
@@ -1937,7 +2030,7 @@ function presetBody(p) {
 function openPresets(m, savedIdx = -1, keepOpen = false) {
   presetMode = m;
   pendingSlot = -1; abandonArmed = false;
-  ['title','game','setup','deck'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','deck','brief'].forEach(id => $(id).classList.add('hidden'));
   $('presets').classList.remove('hidden');
   const data = loadPresets();
   const have = data.filter(Boolean).length;
@@ -2139,7 +2232,7 @@ function openDeck(side, src, next) {
     pieces: dive ? autoPieces(src.pool) : { ...src.pool },
     abilities: autoAbilities(choosable, dive),
   };
-  ['title','game','setup','presets'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','presets','brief'].forEach(id => $(id).classList.add('hidden'));
   $('deck').classList.remove('hidden');
   $('deck-tag').textContent = `DECK ${side === SENTE ? '▲ SENTE' : '△ GOTE'}`;
   $('deck-title').innerHTML =
@@ -2363,7 +2456,7 @@ function showNote(selId, noteId) {
       + (abNames.length ? `<span class="note-ab">初期の能力 ${abNames.join(' / ')}</span>` : '');
 }
 function openSetup(prefer) {
-  ['title','game','presets','deck'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','presets','deck','brief'].forEach(id => $(id).classList.add('hidden'));
   $('setup').classList.remove('hidden');
   fillSelect($('sel-sente')); fillSelect($('sel-gote'));
   $('sel-sente').value = prefer || defaultSide();
@@ -2884,7 +2977,7 @@ let tutStep = 0;
 function openTutorial(from) {
   tutStep = 0;
   tutorialFrom = from || 'title';
-  ['title','game','setup','deck','presets'].forEach(id => $(id).classList.add('hidden'));
+  ['title','game','setup','deck','presets','brief'].forEach(id => $(id).classList.add('hidden'));
   $('tutorial').classList.remove('hidden');
   renderTutorial();
 }
@@ -2958,8 +3051,8 @@ $('btn-settings-2').addEventListener('click', openSettings);
 document.body.classList.toggle('calm', motionCalm);
 
 /* ---------- 起動 ---------- */
-$('btn-solo').addEventListener('click',    () => { primeAudio(); sfx.ui(); toGame(); startRun(); });
-$('btn-versus').addEventListener('click',  () => { primeAudio(); sfx.ui(); openSetup(); });
+$('btn-solo').addEventListener('click',    () => { primeAudio(); sfx.ui(); openBrief('dive', () => { toGame(); startRun(); }); });
+$('btn-versus').addEventListener('click',  () => { primeAudio(); sfx.ui(); openBrief('versus', () => openSetup()); });
 $('btn-presets').addEventListener('click', () => openPresets('view'));
 $('btn-quit').addEventListener('click', () => {
   if ($('draft').classList.contains('hidden') === false) return;

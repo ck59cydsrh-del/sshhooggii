@@ -122,11 +122,16 @@ body{
   font-family:var(--sans);cursor:pointer;text-align:left;
   background:transparent;border:0;border-top:1px solid var(--g12);
   color:var(--ink);padding:15px 2px 14px;
-  display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:0 14px;flex-wrap:wrap;
   transition:padding-left .14s linear,color .14s linear;
 }
 .btn b{font-family:var(--mincho);font-size:14px;letter-spacing:.34em;font-weight:400}
 .btn i{font-style:normal;font-size:9.5px;letter-spacing:.26em;color:var(--g45);text-transform:lowercase}
+.btn>span{font-family:var(--mincho);font-size:14px;letter-spacing:.28em}
+/* 選択肢の重みを数字で言う。撤退と続行の天秤がこの遊びの芯 */
+.btn .btn-sub{width:100%;font-size:9.5px;letter-spacing:.08em;line-height:1.7;
+  color:var(--g45);margin-top:7px;text-transform:none}
+.btn.primary .btn-sub{color:var(--g70)}
 .btn{transform-origin:left center}
 @media (hover:hover){ .btn:hover{padding-left:9px} }
 .btn:active{transform:scale(.985,1.06);opacity:.72}
@@ -951,3 +956,27 @@ body.calm.urgent #board,body.calm.collapsing #board{animation:none}
 .army-note b{color:var(--ink);font-weight:400}
 /* 段の番号は、そこが本題であることの印 */
 .step-head b{background:var(--glow);border-color:var(--ink)}
+
+/* ---------- 出撃前の説明 ---------- */
+.brief-lead{font-family:var(--mincho);font-size:14px;line-height:1.95;letter-spacing:.12em;
+  color:var(--ink);margin:2px 0 24px}
+.brief-lines{display:flex;flex-direction:column;border-top:1px solid var(--ink)}
+@keyframes blIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.brief-line{display:flex;align-items:baseline;gap:13px;padding:14px 2px;
+  border-bottom:1px solid var(--g12);opacity:0;animation:blIn .3s var(--jelly-soft) forwards}
+body.calm .brief-line{opacity:1;animation:none}
+.bl-mark{font-family:var(--mincho);font-size:12px;line-height:1;flex:none;
+  width:24px;height:24px;display:grid;place-items:center;
+  border:1px solid var(--g26);color:var(--g70)}
+.bl-text{font-size:11.5px;line-height:1.95;letter-spacing:.05em;color:var(--g70)}
+.bl-text b{color:var(--ink);font-weight:400;box-shadow:inset 0 -6px 0 var(--green-soft)}
+/* 失うもの。ここだけ反転させて、賭けであることを毎回思い出させる */
+.brief-line.warn .bl-mark{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.brief-line.warn .bl-text{color:var(--ink)}
+.brief-line.warn .bl-text b{box-shadow:inset 0 -6px 0 var(--g12)}
+.brief-stat{font-size:10px;letter-spacing:.16em;color:var(--g45);margin:18px 0 4px}
+
+/* 取った駒が駒台へ飛ぶ */
+.pc.flyer{position:fixed;z-index:80;pointer-events:none;
+  transition:transform .4s var(--jelly-soft),opacity .4s linear}
+body.calm .pc.flyer{display:none}
