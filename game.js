@@ -3020,6 +3020,8 @@ function showMatchup(a, b, then) {
   stopBgm();
   let fightSfx = sfx.fight();
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);   // 「対」の叩きつけ
+  // FIGHT が出るところで音が立たないよう、その手前で引いていく
+  setTimeout(() => { cutSfx(fightSfx, 420); fightSfx = null; }, 1360);
   setTimeout(() => {
     box.classList.add('go');
     if (motionCalm) return;
