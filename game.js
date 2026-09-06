@@ -1842,7 +1842,12 @@ function finish(winner, how) {
     if (how === 'king' && cheatDeath(other(winner))) return;
     // 勝負がつく局は決着の音、途中の局は区切りの音
     const w0 = match.wins;
-    if (w0[winner] + 1 >= 2) { hushBgm(true); sfx.decide(); } else sfx.clear();
+    // 自分の席が分かるなら、負けはいつもの倒れた音で締める
+    const mySeat = net.on ? net.seat : (match.cpu ? SENTE : null);
+    if (w0[winner] + 1 >= 2) {
+      hushBgm(true);
+      if (mySeat !== null && winner !== mySeat) sfx.dead(); else sfx.decide();
+    } else sfx.clear();
     // 残機が削られる側の、いちばん右の点を砕いてから数える
     const loser = other(winner);
     const pips = [...document.querySelectorAll('.vl')]
@@ -1860,7 +1865,7 @@ function finish(winner, how) {
     const why = how === 'king' ? '玉を取った。' : '指せる手が無くなった。';
     // 自分がどちらの席かは、通信対戦や交代操作だと見失いやすい。
     // 「▲の勝ち」ではなく「勝利/敗北」で言い切る。
-    const seat = mode === 'versus' && net.on ? net.seat : (match.cpu ? SENTE : null);
+    const seat = mySeat;
     const champSide = w.s > w.g ? SENTE : GOTE;
     const mine = seat === null ? null : champSide === seat;
     if (w.s >= 2 || w.g >= 2) {
@@ -3010,14 +3015,13 @@ function showMatchup(a, b, then) {
     requestAnimationFrame(tick);
   });
   // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる。
-  // 頭から入りの音。FIGHT で断ち、合図のあとに BGM を頭から掛け直す
+  // 頭から入りの音。合図で断ち、そのあと BGM を頭から掛け直す
   hushBgm(false);
   stopBgm();
   let fightSfx = sfx.fight();
   setTimeout(() => { if (!motionCalm) shake(2.6); }, 620);   // 「対」の叩きつけ
   setTimeout(() => {
     box.classList.add('go');
-    cutSfx(fightSfx, 140); fightSfx = null;      // FIGHT では入りの音を残さない
     if (motionCalm) return;
     shake(1.8);
     // 「対」が退いたあとに、開戦を叩き込む
