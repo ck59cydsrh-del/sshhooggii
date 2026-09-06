@@ -1375,6 +1375,9 @@ function render() {
 function renderHand(side, into) {
   const row = $(into || (side === 's' ? 'hand-s' : 'hand-g'));
   row.innerHTML = '';
+  // 駒が増えると駒台は横に流れる。溢れていることに気づけないと、
+  // 持っているのに使えない駒が出るので、端をぼかして続きがあると示す
+  requestAnimationFrame(() => row.classList.toggle('more', row.scrollWidth > row.clientWidth + 2));
   const hand = pos.h[side], owner = side === 's' ? SENTE : GOTE;
   const entries = HAND_ORDER.filter(t => hand[t] > 0);
   if (!entries.length) {
@@ -1388,7 +1391,9 @@ function renderHand(side, into) {
     item.className = 'hand-item';
     const isSel = sel && sel.kind === 'hand' && sel.t === t && sel.owner === owner;
     const el = pieceEl({ t, o:owner, pr:false }, 'hand ' + (isSel ? 'selected' : ''));
-    if (selectable) el.addEventListener('click', () => onHand(t, owner));
+    // 押す的は駒そのものではなく外側の枠。駒だけだと32pxしかなく、
+    // 指で最も多く触る場所なのに的が小さすぎた
+    if (selectable) item.addEventListener('click', () => onHand(t, owner));
     else el.style.cursor = 'default';
     item.appendChild(el);
     if (hand[t] > 1) {
@@ -3549,7 +3554,7 @@ const TUTORIAL = [
   },
   {
     title: '駒を奪って、次の階へ',
-    text: '相手の駒を取ると、それは<b>自分の持ち駒</b>になります。取った駒は次の階にも持って行けます。',
+    text: '相手の駒を取ると<b>自分の持ち駒</b>になり、次の階にも持って行けます。',
     fig: () => miniBoard(
       { 2:{t:'K',o:GOTE}, 7:{t:'S',o:GOTE}, 12:{t:'G',o:SENTE}, 22:{t:'K',o:SENTE} },
       { 7:'take' },
@@ -3559,7 +3564,7 @@ const TUTORIAL = [
   },
   {
     title: '持ち駒は、どこにでも打てる',
-    text: '持ち駒は<b>空いているマスなら、どこにでも置けます</b>。敵陣のいちばん奥でも構いません。ここがこのゲームの中心です。',
+    text: '持ち駒は<b>空いているマスなら、どこにでも置けます</b>。敵陣の奥でも構いません。ここがこのゲームの中心です。',
     fig: () => {
       const cells = { 2:{t:'K',o:GOTE}, 12:{t:'S',o:GOTE}, 22:{t:'K',o:SENTE} };
       const marks = {};
@@ -3596,7 +3601,7 @@ const TUTORIAL = [
   },
   {
     title: '続けて取ると、跳ねる',
-    text: '駒を続けて取ると<b>連鎖</b>が伸び、得点が跳ね上がります。5連鎖で<b>FEVER</b>。取らない手が続くと切れます。',
+    text: '続けて取ると<b>連鎖</b>が伸び、得点が跳ねます。5連鎖で<b>FEVER</b>。取らない手が続くと切れます。',
     fig: () => miniBoard(
       { 2:{t:'K',o:GOTE}, 11:{t:'P',o:GOTE}, 13:{t:'P',o:GOTE},
         12:{t:'R',o:SENTE,pr:true}, 22:{t:'K',o:SENTE} },
@@ -3607,7 +3612,7 @@ const TUTORIAL = [
   },
   {
     title: '一階ごとに、能力をひとつ',
-    text: '階を抜けるたび、<b>3つから1つ</b>能力を選びます。駒の動きが変わるもの、手数が増えるものなど68種類。',
+    text: `階を抜けるたび、<b>3つから1つ</b>能力を選びます。駒の動きが変わるもの、手数が増えるものなど${ABILITIES.length}種類。`,
     fig: () => {
       const base = silverReach(null), wide = silverReach({ silverWide:1 });
       const mk = ms => { const o = {}; for (const i of base) o[i] = 'base'; for (const i of ms) if (!base.includes(i)) o[i] = 'move'; return o; };

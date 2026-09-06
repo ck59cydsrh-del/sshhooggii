@@ -383,16 +383,16 @@ body.calm #matchup.go *{animation:none !important}
 body.calm #matchup{transition:none}
 
 /* ---------- はじめての説明 ---------- */
-.tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}
-.tut-note{font-size:10px;letter-spacing:.06em;color:var(--g45);text-align:center;line-height:1.7}
-.tut-text{font-size:12.5px;line-height:2.05;color:var(--g70);letter-spacing:.04em;margin-bottom:6px}
+.tut-fig{display:flex;flex-direction:column;align-items:center;gap:9px;margin:2px 0 14px}
+.tut-note{font-size:10px;letter-spacing:.06em;color:var(--g45);text-align:center;line-height:1.6}
+.tut-text{font-size:12.5px;line-height:1.9;color:var(--g70);letter-spacing:.04em;margin-bottom:4px}
 .tut-text b{color:var(--ink);font-weight:400;box-shadow:inset 0 -6px 0 var(--green-soft)}
 
 /* 小さな盤の図。本体の盤と同じ語彙で描く。
    クラス名は .tfig。ボタンの .mini と衝突していたので分けてある */
-.tfig{width:min(230px,72vw);height:auto;display:block}
+.tfig{width:min(172px,54vw);height:auto;display:block}
 .tfig.small{width:76px}
-.tfig.pair{width:min(148px,40vw)}
+.tfig.pair{width:min(132px,36vw)}
 .tfig .m-grid{stroke:var(--g12);stroke-width:1}
 .tfig .m-move,.tfig .m-drop{fill:var(--glow);stroke:var(--ink);stroke-width:1}
 .tfig .m-drop{opacity:.75}
@@ -584,7 +584,8 @@ body.calm .tray-label.grew b{animation:none}
 .tray-row{display:flex;flex-wrap:wrap;gap:5px;flex:1;align-items:center}
 .tray-self{margin-top:18px}
 .tray-enemy{margin-bottom:16px}
-.hand-item{display:flex;align-items:flex-end;gap:2px;padding:6px 2px;margin:-6px 0}
+.hand-item{display:flex;align-items:flex-end;gap:2px;padding:6px 4px;margin:-6px 0;
+  min-width:40px;justify-content:center;cursor:pointer}
 .hand-count{font-size:10px;color:var(--g70);padding-bottom:2px;letter-spacing:.04em}
 .tray-empty{font-size:10px;letter-spacing:.22em;color:var(--g45)}
 
@@ -627,6 +628,8 @@ body.calm .tray-label.grew b{animation:none}
 .tray-row{flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;
   scrollbar-width:none;-ms-overflow-style:none}
 .tray-row::-webkit-scrollbar{display:none}
+/* 横に流れているときだけ端をぼかす。掛けっぱなしだと駒が欠けて見える */
+.tray-row.more{mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
 #log{flex:none}
 
 #board-wrap{position:relative;flex:1}
@@ -708,6 +711,10 @@ body.flipped .pc:not(.gote).placed{animation:jellyGote .42s var(--jelly)}
 body.flipped .pc.gote.hand:active{transform:scale(.86,1.16)}
 body.flipped .pc:not(.gote).hand:active{transform:rotate(180deg) scale(.86,1.16)}
 .pc.hand.selected polygon{stroke-width:4}
+/* いま何を持っているかが分からないと、打つ場所だけ緑になって混乱する。
+   選んだ駒を持ち上げて、足元に線を引く */
+.pc.hand.selected:not(.gote){transform:translateY(-4px)}
+.hand-item:has(.pc.hand.selected){box-shadow:inset 0 -2px 0 var(--green)}
 
 /* ---------- 演出: ここだけ大きさと色が出る ---------- */
 .fx{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:3}
@@ -1282,3 +1289,28 @@ body.calm .pc.flyer{display:none}
   padding:11px 2px;min-height:40px;border-radius:0}
 .pb-rename input:focus{outline:none;border-bottom-color:var(--green)}
 .pb-rename .mini{flex:none}
+
+/* 説明を読む画面なので、下のボタンに高さを渡しすぎない。
+   本文が285pxしかないのにボタン群が264pxを占めていた(実測)。
+   横に並べると .mi の中身が縮まず右にあふれるので、縦のまま丈を詰める */
+#tutorial .mi-sub{display:none}
+#tutorial .menu .mi{padding-top:10px;padding-bottom:10px}
+
+/* 背の低い端末(iPhone SE 級)。本文の枠が226pxまで縮むので、
+   図・見出し・ボタンをまとめて詰めて7頁とも1画面に収める */
+@media (max-height:740px){
+  #tutorial .screen-title{font-size:24px;margin-bottom:18px}
+  #tutorial .tut-fig{gap:6px;margin:0 0 8px}
+  #tutorial .tfig{width:min(126px,40vw)}
+  #tutorial .tfig.pair{width:min(104px,28vw)}
+  #tutorial .tfig.small{width:60px}
+  #tutorial .tut-text{line-height:1.75;font-size:12px}
+  #tutorial .tf-tray{margin-top:6px;padding-top:6px;width:min(172px,54vw)}
+  #tutorial .menu .mi{padding-top:9px;padding-bottom:9px}   /* これ以上詰めるとタップ40pxを割る */
+}
+
+/* 対局中は下の余白を詰め、空いたぶんを盤に渡す。
+   64pxの余白のせいで盤が197pxまで痩せ、1マスが39pxしかなかった */
+body:has(#game:not(.hidden)){
+  padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 12px));
+}
