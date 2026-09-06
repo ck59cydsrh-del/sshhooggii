@@ -272,22 +272,56 @@ body{
 .deck-step{font-size:10px;letter-spacing:.24em;color:var(--green);margin:-12px 0 20px}
 
 /* 開始前の編成お披露目 */
+/* 対戦の入り。上下から突き合わせ、中央の「対」を叩きつける */
 #matchup{position:fixed;inset:0;z-index:90;background:var(--paper);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-  padding:24px;cursor:pointer;animation:muIn .3s linear}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:24px;cursor:pointer;overflow:hidden;animation:muIn .22s linear}
 @keyframes muIn{from{opacity:0}to{opacity:1}}
 #matchup.out{animation:muOut .38s linear forwards;pointer-events:none}
 @keyframes muOut{from{opacity:1}to{opacity:0}}
-.mu-side{width:100%;max-width:330px;animation:muCard .4s var(--jelly) backwards}
-.mu-side:nth-child(3){animation-delay:.14s}
-@keyframes muCard{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* 決まった瞬間、盤へ抜ける前に一度だけ白く飛ばす */
+#matchup.go::after{content:'';position:absolute;inset:0;background:var(--paper);
+  animation:muGo .5s linear forwards;pointer-events:none}
+@keyframes muGo{0%{opacity:0}22%{opacity:.9}100%{opacity:0}}
+
+.mu-round{font-family:var(--didone);font-size:13px;letter-spacing:.44em;color:var(--g45);
+  margin-bottom:2px;animation:muCard .3s var(--jelly) backwards}
+
+.mu-side{width:100%;max-width:330px;position:relative}
+.mu-side:nth-child(2){animation:muFromTop .52s var(--jelly) backwards;animation-delay:.06s}
+.mu-side:nth-child(4){animation:muFromBottom .52s var(--jelly) backwards;animation-delay:.2s}
+@keyframes muFromTop{from{opacity:0;transform:translateY(-64px) skewY(-2deg)}to{opacity:1;transform:none}}
+@keyframes muFromBottom{from{opacity:0;transform:translateY(64px) skewY(2deg)}to{opacity:1;transform:none}}
+@keyframes muCard{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
 .mu-name{display:flex;align-items:baseline;gap:10px;font-family:var(--mincho);font-size:19px;
   letter-spacing:.16em;border-bottom:1px solid var(--ink);padding-bottom:7px;margin-bottom:10px}
 .mu-name span{font-size:11px;letter-spacing:.2em;color:var(--g45)}
 .mu-pieces{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
 .mu-val{font-size:10px;letter-spacing:.12em;color:var(--g45);margin-bottom:9px}
 .mu-abils{display:flex;flex-wrap:wrap;gap:6px 12px;min-height:14px}
-.mu-vs{font-family:var(--mincho);font-size:15px;letter-spacing:.3em;color:var(--g26)}
+
+/* 中央の「対」。遅れて叩きつけ、余韻で脈打つ */
+.mu-vs{position:relative;display:grid;place-items:center;width:100%;max-width:330px;height:52px}
+.mu-vs b{font-family:var(--mincho);font-size:40px;font-weight:400;letter-spacing:.2em;
+  color:var(--ink);line-height:1;animation:muSlam .46s cubic-bezier(.2,1.8,.35,1) backwards;
+  animation-delay:.62s}
+@keyframes muSlam{
+  0%{opacity:0;transform:scale(3.4)}
+  55%{opacity:1;transform:scale(.86)}
+  100%{opacity:1;transform:scale(1)}
+}
+/* 叩きつけた瞬間に横へ走る線 */
+.mu-vs::before,.mu-vs::after{content:'';position:absolute;top:50%;height:2px;background:var(--ink);
+  width:0;animation-duration:.5s;animation-timing-function:var(--jelly);
+  animation-fill-mode:backwards;animation-delay:.66s}
+.mu-vs::before{right:calc(50% + 32px);animation-name:muLineL}
+.mu-vs::after{left:calc(50% + 32px);animation-name:muLineR}
+@keyframes muLineL{from{width:0;opacity:0}to{width:calc(50% - 32px);opacity:1}}
+@keyframes muLineR{from{width:0;opacity:0}to{width:calc(50% - 32px);opacity:1}}
+body.calm .mu-side,body.calm .mu-vs b,body.calm .mu-round{animation:none}
+body.calm .mu-vs::before,body.calm .mu-vs::after{animation:none;width:calc(50% - 32px)}
+body.calm #matchup.go::after{animation:none;opacity:0}
 
 /* ---------- はじめての説明 ---------- */
 .tut-fig{display:flex;flex-direction:column;align-items:center;gap:12px;margin:6px 0 22px}

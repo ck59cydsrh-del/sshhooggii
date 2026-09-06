@@ -1847,10 +1847,10 @@ function finish(winner, how) {
         : `自分 のこり${myLeft}　相手 のこり${foeLeft}`;
       const brink = (myLeft === 1 || foeLeft === 1)
         ? `\n次で決まる。${myLeft === 1 ? '負ければ終わり。' : '勝てば決着。'}` : '';
+      // 勝負の途中では抜けさせない。編成を組み直す隙も作らない
       const nextRound = () => { match.game++; floorTransition(match.game, startVersus, 'round'); };
       showOverlay(head, `${why}\n${lives}${brink}`, [
         ['次の勝負へ', nextRound],
-        ['タイトルへ', toTitle],
       ], `ROUND ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'), nextRound);
     }
     return;
@@ -2922,9 +2922,14 @@ function showMatchup(a, b, then) {
            `<p class="mu-val">${poolTotal(d.pool)}枚 / 価値 ${val.toLocaleString('ja-JP')}</p>` +
            `<div class="mu-abils">${abils}</div></div>`;
   };
-  box.innerHTML = card('▲ 先手', a) + '<div class="mu-vs">対</div>' + card('△ 後手', b);
-  box.classList.remove('hidden');
-  sfx.clear();
+  box.innerHTML = `<div class="mu-round">ROUND ${match ? match.game : 1}</div>`
+                + card('▲ 先手', a) + '<div class="mu-vs"><b>対</b></div>' + card('△ 後手', b);
+  box.classList.remove('hidden', 'out');
+  box.classList.remove('go'); void box.offsetWidth;
+  // 上下から突き合わせ、中央の「対」が遅れて叩きつけられる
+  sfx.ui();
+  setTimeout(() => { if (!motionCalm) { sfx.big(); shake(2.2); flashScreen(); } }, 620);
+  setTimeout(() => { box.classList.add('go'); if (!motionCalm) { sfx.jackpot(); ringBurst(3); } }, 1500);
   let done = false;
   const go = () => {
     if (done) return;
@@ -2934,7 +2939,7 @@ function showMatchup(a, b, then) {
     setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
   };
   box.addEventListener('click', go);
-  setTimeout(go, 3600);            // 触らなくても進む
+  setTimeout(go, 3300);            // 触らなくても進む
 }
 
 $('btn-setup-start').addEventListener('click', async () => {
@@ -3545,7 +3550,10 @@ $('btn-versus').addEventListener('click',  () => { primeAudio(); sfx.ui(); openB
 $('btn-presets').addEventListener('click', () => openPresets('view'));
 $('btn-quit').addEventListener('click', () => {
   if ($('draft').classList.contains('hidden') === false) return;
-  showOverlay('中断', 'この階の途中で抜けます。\n潜っていた分の駒と能力は失われます。', [
+  const body = mode === 'versus'
+    ? 'この勝負を投げて抜けます。\n残りのラウンドは行われません。'
+    : 'この階の途中で抜けます。\n潜っていた分の駒と能力は失われます。';
+  showOverlay('中断', body, [
     ['続ける', hideOverlay],
     ['タイトルへ', toTitle],
   ], 'ABORT?');
