@@ -595,7 +595,7 @@ body.calm .tray-label.grew b{animation:none}
 .files,.ranks{display:grid;font-size:9px;letter-spacing:.1em;color:var(--g45)}
 .files{grid-template-columns:repeat(5,1fr);margin-right:19px}
 .files span{text-align:center}
-.ranks{grid-template-rows:repeat(5,1fr);width:10px;align-items:center}
+.ranks{grid-template-rows:repeat(5,1fr);width:10px;align-items:center;align-self:center}
 .ranks span{text-align:center}
 
 /* 盤の画面は流さない。能力や持ち駒が増えても、盤と駒台と手控えが
@@ -605,11 +605,11 @@ body.calm .tray-label.grew b{animation:none}
 #game>*{flex:none}                      /* 縦に潰れると字が切れる */
 /* 盤の枠だけが残りの高さを引き受ける */
 #game>.board-frame{flex:1 1 0;min-height:0;align-items:center}
-#game .board-row{flex:1 1 0;min-height:0;justify-content:center}
+#game .board-row{flex:1 1 0;min-height:0;justify-content:center;align-items:center}
 /* 段のラベルは盤の右にしか無いので、そのぶん盤が左へずれる。
    左に同じ幅の逃げを置いて、盤の真ん中のマスを画面の真ん中に合わせる。 */
 #game .board-row::before{content:'';flex:none;width:10px}
-#game #files{margin-left:19px}
+#game #files{position:absolute;left:0;bottom:100%;margin:0 0 9px}
 #game #board-wrap{min-height:0;flex:0 0 auto;display:flex;align-items:center;justify-content:flex-start}
 /* 盤の一辺は fitBoard() が測って入れる。筋のラベルも同じ幅に合わせる */
 #game #board{width:100%;height:auto;aspect-ratio:1/1;margin:0}

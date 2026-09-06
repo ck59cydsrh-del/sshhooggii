@@ -867,7 +867,10 @@ function fitBoard() {
   if (board.style.width === px) return;    // 同じ値で書き戻すと監視が回り続ける
   wrap.style.width = px;
   board.style.width = px;
+  // 筋と段のラベルは盤とは別の入れ物にいるので、寸法を渡さないと盤だけが
+  // 縦中央へ寄って離れていく(段は最大83px、筋は111pxずれていた)
   if (files) files.style.width = px;
+  if (ranks) ranks.style.height = px;
 }
 /* 監視の中で寸法を書き換えると同じフレームで回り続けるので、1フレーム待つ */
 let fitQueued = false;
@@ -2005,9 +2008,15 @@ function finish(winner, how) {
   const ahead = `敵 ${force.length}枚(${force.map(t => NAME[t]).join('')})`
     + (nHand ? ` ＋持ち駒${nHand}` : '') + (nBlock ? ` / 通行不可${nBlock}` : '')
     + ` / 手数${floorBudget(nf)}`;
+  // 3階ごとは補給。駒がもらえるものだけを並べ、ほかの階では駒を出さない。
+  // 混ぜると補給の回が特別でなくなり、能力を伸ばす回も薄まる
+  const supply = run.floor % 3 === 0;
   showOverlay(`${run.floor}階 突破`, body, [
-    ['能力を選ぶ', () => openDraft(() => { run.floor++; floorTransition(run.floor, startFloor); },
-        'CLEAR ' + String(run.floor).padStart(2, '0'), `${run.floor}階の戦利`),
+    [supply ? '駒を受け取る' : '能力を選ぶ',
+     () => openDraft(() => { run.floor++; floorTransition(run.floor, startFloor); },
+        'CLEAR ' + String(run.floor).padStart(2, '0'),
+        supply ? `${run.floor}階の戦利 — 補給、駒を選ぶ` : `${run.floor}階の戦利`,
+        supply ? CAT['獲得'] : NON_GAIN),
       `${nf}階 — ${ahead}。倒れれば全部失う`],
     ['撤退して編成を保存', () => openPresets('save'), carry],
   ], 'CLEAR ' + String(run.floor).padStart(2, '0'), rank);
