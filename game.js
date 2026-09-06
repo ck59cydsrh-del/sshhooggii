@@ -552,6 +552,7 @@ const SLOTS = 5;
 
 let pos = null, mode = 'solo', run = null;
 let sel = null, legal = [], busy = false, pendingPromo = null;
+let risky = [];        // 選んだ駒の行き先のうち、指すと玉が取られるマス
 let goteIsCPU = true;
 let floorState = null;   // 階ごとの使い切り
 let soundOn = localStorage.getItem('komagari.sound') !== '0';
@@ -895,9 +896,12 @@ function flyToHand(idx, t, owner) {
 }
 
 /* 能力が発動したら名前と効果を大きく出す。連続発動は積んで見せる */
+let transitioning = false, annQueue = [];
 function announce(id, detail) {
   const a = ABI_BY_ID[id];
   if (!a) return;
+  // 階の帯が覆っている間は見えないので、明けてから出す
+  if (transitioning) { annQueue.push([id, detail]); return; }
   const box = $('announce');
   if (!box) return;
   const el = document.createElement('div');
@@ -918,9 +922,15 @@ function announce(id, detail) {
 
 
 /* ---------- 階の遷移。墨の帯が走り、階数が刻まれる ---------- */
+function flushAnnounce() {
+  const q = annQueue; annQueue = [];
+  q.forEach(([id, detail], i) => setTimeout(() => announce(id, detail), 90 * i));
+}
 function floorTransition(floor, then, label) {
   const el = $('transition');
   if (!el || motionCalm) { then(); return; }
+  transitioning = true;
+  setTimeout(() => { transitioning = false; flushAnnounce(); }, 920);
   $('tr-num').textContent = String(floor).padStart(2, '0');
   $('tr-label').textContent = label || 'floor';
   el.classList.remove('hidden', 'run');
@@ -935,8 +945,12 @@ function floorTransition(floor, then, label) {
 function stamp(text, cls = '') {
   const box = $('judge');
   if (!box || motionCalm) return;
+  // 同じ場所に重ねない。二枚目からは下へずらす(「あと1枚」と「王手」が
+  // 同時に出て、どちらも読めないことがあった)
+  const stacked = box.querySelectorAll('.stamp').length;
   const el = document.createElement('div');
   el.className = 'stamp ' + cls;
+  if (stacked) el.style.setProperty('--stack', stacked);
   el.textContent = text;
   box.appendChild(el);
   setTimeout(() => el.remove(), 900);
@@ -1252,6 +1266,7 @@ function render() {
     else if (inZone(rowOf(i), foe)) cell.classList.add('zone', 'zone-foe');
     if (legal.includes(i)) {
       cell.classList.add('clickable', pos.b[i] ? 'capture' : 'move');
+      if (risky.includes(i)) cell.classList.add('risky');   // 指すと玉が取られる
     }
     if (sel && sel.kind === 'board' && sel.idx === i) cell.classList.add('sel');
     const p = pos.b[i];
@@ -1451,12 +1466,27 @@ const setLog = t => { $('log').textContent = t; };
 /* ============================================================
    入力
    ============================================================ */
+/* 指した後に玉が取られる手を先に洗い出す。将棋の反則にはせず、
+   印を出すだけに留める(玉を取る/取られるがこの遊びの中心なので、
+   合法手を狭めると斬首や影武者の意味が消える) */
+function markRisky(mvs) {
+  risky = [];
+  if (!humanControls(pos.turn)) return;
+  const me = pos.turn;
+  for (const m of mvs) {
+    const u = make(pos, m);
+    const bad = inCheck(pos, me);
+    unmake(pos, m, u);
+    if (bad) risky.push(m.to);
+  }
+}
 function onHand(t, owner) {
   if (busy) return;
-  if (sel && sel.kind === 'hand' && sel.t === t) { sel = null; legal = []; render(); return; }
+  if (sel && sel.kind === 'hand' && sel.t === t) { sel = null; legal = []; risky = []; render(); return; }
   sel = { kind:'hand', t, owner };
   legal = [];
   for (let i = 0; i < NS; i++) if (canDropAt(pos, t, owner, i)) legal.push(i);
+  markRisky(legal.map(i => ({ drop:t, to:i })));
   render();
 }
 function onCell(i) {
@@ -1469,8 +1499,10 @@ function onCell(i) {
     return applyMove({ from:sel.idx, to:i, pr:false });
   }
   const p = pos.b[i];
-  if (p && p.o === pos.turn) { sel = { kind:'board', idx:i }; legal = targets(pos, i); }
-  else { sel = null; legal = []; }
+  if (p && p.o === pos.turn) {
+    sel = { kind:'board', idx:i }; legal = targets(pos, i);
+    markRisky(legal.map(to => ({ from:i, to, pr:false })));
+  } else { sel = null; legal = []; risky = []; }
   render();
 }
 $('promo-yes').addEventListener('click', () => { $('promo').classList.add('hidden'); applyMove({ ...pendingPromo, pr:true }); });
@@ -1516,7 +1548,7 @@ function applyMove(mv, fromNet) {
   const captured = mv.drop ? null : pos.b[mv.to];
   const attacker = mv.drop ? null : { t: pos.b[mv.from].t, pr: pos.b[mv.from].pr };
   make(pos, mv);
-  sel = null; legal = [];
+  sel = null; legal = []; risky = [];
   floorState.moves++;
   if (floorState.played) floorState.played[mover]++;
   const landed = mv.to;
@@ -1633,12 +1665,12 @@ function applyMove(mv, fromNet) {
   // 結果だけを伝える)。1階で気づかず取られる事故がいちばん多かった。
   const meNow = myView();
   if (pos.b.some(q => q && q.t === 'K' && q.o === meNow) && inCheck(pos, meNow)) {
-    msg += '　◆ 玉があぶない';
-    if (!floorState.warned) { floorState.warned = true; stamp('玉があぶない', 'danger'); }
+    msg += '　◆ 王手';
+    if (!floorState.warned) { floorState.warned = true; stamp('王　手', 'danger'); }
     sfx.alarm(); shake(1.4);
   } else if (floorState) {
     floorState.warned = false;
-    if (inCheck(pos, other(meNow))) msg += '　◆ 王手';
+    if (inCheck(pos, other(meNow))) msg += '　◆ 王手をかけた';
   }
   setLog(msg);
   if (!motionCalm) {
