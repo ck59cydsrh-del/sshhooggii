@@ -276,6 +276,8 @@ body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   padding:24px;cursor:pointer;animation:muIn .3s linear}
 @keyframes muIn{from{opacity:0}to{opacity:1}}
+#matchup.out{animation:muOut .38s linear forwards;pointer-events:none}
+@keyframes muOut{from{opacity:1}to{opacity:0}}
 .mu-side{width:100%;max-width:330px;animation:muCard .4s var(--jelly) backwards}
 .mu-side:nth-child(3){animation-delay:.14s}
 @keyframes muCard{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -1158,3 +1160,17 @@ body.calm .cell.in-danger{animation:none;box-shadow:inset 0 0 0 3px var(--ink)}
 .cell.in-reach{box-shadow:inset 0 0 0 2px var(--green)}
 .stamp.danger{font-family:var(--mincho);font-size:30px;letter-spacing:.18em;color:var(--ink)}
 
+/* 自動で次へ進むまでの帯 */
+.ov-auto{height:2px;background:var(--g12);margin-top:14px;overflow:hidden}
+.ov-auto::after{content:'';display:block;height:100%;width:0;background:var(--green)}
+.ov-auto.run::after{animation:ovAuto 3.6s linear forwards}
+@keyframes ovAuto{from{width:0}to{width:100%}}
+
+/* 編成の名前を付け替える */
+.pb-rename{display:flex;align-items:center;gap:9px;margin:10px 0 4px}
+.pb-rename label{font-size:9.5px;letter-spacing:.16em;color:var(--g45);flex:none}
+.pb-rename input{flex:1;min-width:0;font-family:var(--mincho);font-size:13px;letter-spacing:.12em;
+  background:transparent;border:0;border-bottom:1px solid var(--g26);color:var(--ink);
+  padding:5px 2px;border-radius:0}
+.pb-rename input:focus{outline:none;border-bottom-color:var(--green)}
+.pb-rename .mini{flex:none}

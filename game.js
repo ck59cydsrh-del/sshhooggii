@@ -1666,15 +1666,11 @@ function applyMove(mv, fromNet) {
   repaint();
   // 玉が取られる位置に入ったことは、必ず言う(相手の利きは見せない方針なので
   // 結果だけを伝える)。1階で気づかず取られる事故がいちばん多かった。
+  // 文字では言わない(盤の明滅で足りる、という判断)。玉のマスは render() が示す
   const meNow = myView();
   if (pos.b.some(q => q && q.t === 'K' && q.o === meNow) && inCheck(pos, meNow)) {
-    msg += '　◆ 王手';
-    if (!floorState.warned) { floorState.warned = true; stamp('王　手', 'danger'); }
-    sfx.alarm(); shake(1.4);
-  } else if (floorState) {
-    floorState.warned = false;
-    if (inCheck(pos, other(meNow))) msg += '　◆ 王手をかけた';
-  }
+    if (!floorState.warned) { floorState.warned = true; sfx.alarm(); shake(1.4); }
+  } else if (floorState) floorState.warned = false;
   setLog(msg);
   if (!motionCalm) {
     const cell = $('board').children[boardToView(landed)];
@@ -1851,10 +1847,11 @@ function finish(winner, how) {
         : `自分 のこり${myLeft}　相手 のこり${foeLeft}`;
       const brink = (myLeft === 1 || foeLeft === 1)
         ? `\n次で決まる。${myLeft === 1 ? '負ければ終わり。' : '勝てば決着。'}` : '';
+      const nextRound = () => { match.game++; floorTransition(match.game, startVersus, 'round'); };
       showOverlay(head, `${why}\n${lives}${brink}`, [
-        ['次の勝負へ', () => { match.game++; floorTransition(match.game, startVersus, 'round'); }],
+        ['次の勝負へ', nextRound],
         ['タイトルへ', toTitle],
-      ], `ROUND ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'));
+      ], `ROUND ${match.game}`, null, won === null ? '' : (won ? 'win' : 'lose'), nextRound);
     }
     return;
   }
@@ -2190,7 +2187,9 @@ $('ability-close').addEventListener('click', () => $('ability-modal').classList.
 /* ============================================================
    オーバーレイ / 画面
    ============================================================ */
-function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '') {
+let overlayTimer = null;
+function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '', auto = null) {
+  if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
   $('overlay').classList.remove('win', 'lose');
   if (mood) $('overlay').classList.add(mood);
   $('overlay-tag').textContent = tag;
@@ -2218,8 +2217,32 @@ function showOverlay(title, body, actions, tag = 'RESULT', rank = null, mood = '
     box.appendChild(b);
   });
   $('overlay').classList.remove('hidden');
+  // 決着していない局は、結果を見せてから勝手に次へ進む(押させない)
+  if (auto) {
+    const myGen = gen;
+    let bar = $('overlay-card-auto');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'overlay-card-auto'; bar.className = 'ov-auto';
+      $('overlay-actions').parentElement.appendChild(bar);
+    }
+    bar.className = 'ov-auto'; void bar.offsetWidth; bar.classList.add('run');
+    overlayTimer = setTimeout(() => {
+      overlayTimer = null;
+      if (myGen !== gen) return;
+      if ($('overlay').classList.contains('hidden')) return;
+      bar.className = 'ov-auto';
+      auto();
+    }, 3600);
+  } else {
+    const bar = $('overlay-card-auto');
+    if (bar) bar.className = 'ov-auto';
+  }
 }
-const hideOverlay = () => $('overlay').classList.add('hidden');
+const hideOverlay = () => {
+  if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+  $('overlay').classList.add('hidden');
+};
 
 /* 出撃前の説明。潜行は「集めたものを賭ける」遊びなので、
    何が増えて何を失うのかを毎回きちんと言ってから始める。 */
@@ -2364,6 +2387,11 @@ function presetBody(p) {
 
   const usable = ids.filter(id => VS_OK.has(id)).length;
   return `<div class="preset-body">
+    <div class="pb-rename">
+      <label for="pb-name">名前</label>
+      <input id="pb-name" type="text" maxlength="18" value="${(p.name || '').replace(/"/g, '&quot;')}">
+      <button id="pb-name-ok" class="mini">変える</button>
+    </div>
     <p class="pb-head"><span>駒</span><b>${poolTotal(p.pool)}枚 / 価値 ${value.toLocaleString('ja-JP')}</b></p>
     <div class="pb-pieces">${chips}</div>
     <p class="pb-head"><span>能力</span><b>${ids.length}個${
@@ -2438,6 +2466,22 @@ function openPresets(m, savedIdx = -1, keepOpen = false) {
       wrap.insertAdjacentHTML('beforeend', presetBody(p));
     }
     list.appendChild(wrap);
+  }
+
+  // 名前は好きに付け替えられる。何を持ち帰った編成か自分の言葉で残せる
+  const nameBox = $('pb-name'), nameOk = $('pb-name-ok');
+  if (nameBox && nameOk && presetOpen >= 0 && data[presetOpen]) {
+    const apply = () => {
+      const v = nameBox.value.trim().slice(0, 18);
+      if (!v || v === data[presetOpen].name) return;
+      const all = loadPresets();
+      all[presetOpen].name = v;
+      savePresets(all);
+      sfx.ui();
+      openPresets(presetMode, savedIdx, true);
+    };
+    nameOk.addEventListener('click', apply);
+    nameBox.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
   }
 
   // 開いている編成をそのまま対戦へ(ここが本筋の合流点)
@@ -2881,9 +2925,16 @@ function showMatchup(a, b, then) {
   box.innerHTML = card('▲ 先手', a) + '<div class="mu-vs">対</div>' + card('△ 後手', b);
   box.classList.remove('hidden');
   sfx.clear();
-  const go = () => { box.classList.add('hidden'); box.removeEventListener('click', go); then(); };
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    box.removeEventListener('click', go);
+    box.classList.add('out');                    // 消えぎわを溶かす
+    setTimeout(() => { box.classList.add('hidden'); box.classList.remove('out'); then(); }, 380);
+  };
   box.addEventListener('click', go);
-  setTimeout(go, 4200);            // 触らなくても進む
+  setTimeout(go, 3600);            // 触らなくても進む
 }
 
 $('btn-setup-start').addEventListener('click', async () => {
