@@ -2380,11 +2380,9 @@ const BRIEF = {
     lead: '編成を組んで、先に2勝した方が勝ち。',
     lines: [
       ['駒', '盤に出せるのは<b>10枚</b>。局ごとに先番が入れ替わる'],
-      ['安', '持ち帰った編成は能力が<b>安い</b>(並1 / 希2 / 極5)。ただし修得したものだけ'],
-      ['深', '潜行のスコア30万ごとに<b>予算 +1</b>(最大 +2)。深く潜った編成ほど積める'],
-      ['広', '既定編成は駒が固定。能力は<b>全種</b>から選べるが値は張る(並2 / 希4 / 極10)'],
+      ['誰', 'CPUか、この端末で交代か、べつの端末か。下から選ぶ'],
     ],
-    go: '編成を選ぶ', goSub: 'だれと → どの編成で → 駒 → 能力',
+    go: 'すすむ', goSub: 'どの編成で → 駒 → 能力',
   },
 };
 let briefThen = null;
@@ -2411,6 +2409,7 @@ function openBrief(kind, then) {
 
   const saved = loadPresets().filter(Boolean);
   const floor = Number(localStorage.getItem(BEST_KEY) || 0);
+  $('brief-mode').classList.toggle('hidden', kind !== 'versus');
   $('brief-stat').textContent = kind === 'dive'
     ? (floor ? `最高到達 ${floor}階   ` : '') + `編成の空き枠 ${SLOTS - saved.length} / ${SLOTS}`
     : saved.length ? `持ち帰った編成 ${saved.length} / ${SLOTS}`
@@ -2700,13 +2699,19 @@ let deckEdit = null, deckFilter = null, deckStep = 'pieces';
 
 const poolTotal = pool => Object.values(pool).reduce((a,b) => a+b, 0);
 
-/* 価値の高い順に10枚まで自動で選ぶ */
+/* 駒のおまかせ。価値順に上から10枚だと毎回まったく同じ編成になり、
+   おまかせにならなかった。価値で重みを付けたうえで引き、ばらけさせる */
 function autoPieces(src) {
   const picked = {};
   const flat = [];
   for (const t of HAND_ORDER) for (let i = 0; i < (src[t]||0); i++) flat.push(t);
-  flat.sort((a,b) => VAL[b] - VAL[a]);
-  for (const t of flat.slice(0, DECK_PIECES)) picked[t] = (picked[t]||0) + 1;
+  for (let n = 0; n < DECK_PIECES && flat.length; n++) {
+    let total = 0; for (const t of flat) total += VAL[t];
+    let x = Math.random() * total, k = 0;
+    for (; k < flat.length - 1; k++) { x -= VAL[flat[k]]; if (x <= 0) break; }
+    const t = flat.splice(k, 1)[0];
+    picked[t] = (picked[t]||0) + 1;
+  }
   return picked;
 }
 
@@ -2807,9 +2812,15 @@ function renderDeck() {
   $('deck-cost').innerHTML =
     `コスト <b class="${cost >= deckBudget ? 'full' : ''}">${cost}</b> / ${deckBudget}` +
     `　枠 <b class="${slots >= DECK_SLOTS ? 'full' : ''}">${slots}</b> / ${DECK_SLOTS}`;
-  $('deck-ab-hint').innerHTML = d.dive
+  // 並びを安い順にした結果、選んだものがリストの下へ沈んで見えなくなる。
+  // いま積んでいるものは、常に見える固定部に出す
+  const chosenNames = Object.keys(d.abilities)
+    .sort((a, b) => ABI_BY_ID[a].r - ABI_BY_ID[b].r)
+    .map(id => `<i>${ABI_BY_ID[id].n}</i>`).join('');
+  $('deck-ab-hint').innerHTML = (d.dive
     ? `並1 / 希2 / 極5` + (d.bonus ? `　<b>スコアで予算 +${d.bonus}</b>` : '　スコア30万ごとに予算 +1')
-    : '並2 / 希4 / 極10';
+    : '並2 / 希4 / 極10')
+    + (chosenNames ? `<span class="dh-chosen">${chosenNames}</span>` : '');
   const meter = $('deck-meter');
   meter.innerHTML = '';
   for (let i = 0; i < deckBudget; i++) {
@@ -2833,16 +2844,10 @@ function renderDeck() {
 
   const list = $('deck-abilities');
   list.innerHTML = '';
-  // 選んだものを先頭に固定して、いま何を積んでいるかが常に見えるようにする
+  // 並びは安いものから。選んだものは緑の帯と■で分かるので先頭には寄せない
   const sorted = d.choosable.slice()
     .filter(a => d.abilities[a.id] || !deckFilter || catOf(a.id) === deckFilter)
-    .sort((a, b) => {
-      const sa = d.abilities[a.id] ? 1 : 0, sb = d.abilities[b.id] ? 1 : 0;
-      if (sa !== sb) return sb - sa;
-      const ea = d.earned[a.id] ? 1 : 0, eb = d.earned[b.id] ? 1 : 0;
-      if (ea !== eb) return eb - ea;
-      return a.r - b.r;
-    });
+    .sort((a, b) => (a.r - b.r) || a.n.localeCompare(b.n, 'ja'));
   for (const a of sorted) {
     const on = !!d.abilities[a.id];
     const c = abCost(a, d.dive);
@@ -2882,14 +2887,14 @@ function renderDeck() {
   $('btn-deck-ok').querySelector('b').textContent = onPieces ? 'つぎへ' : '決　定';
   $('btn-deck-ok').querySelector('.mi-sub').textContent =
     onPieces ? '能力を選ぶ' : 'この編成で始める';
+  // おまかせはいまの段にしか効かない。「駒と能力をまとめて」は嘘だった
+  $('btn-deck-auto').querySelector('.mi-sub').textContent =
+    onPieces ? '駒を10枚えらぶ' : '能力を予算いっぱいに積む';
   const short = poolTotal(d.pieces) !== DECK_PIECES && !d.fixed;
   $('btn-deck-ok').classList.toggle('disabled', onPieces ? short : poolTotal(d.pieces) === 0);
   $('deck-step').textContent = onPieces ? '1 / 2　駒をえらぶ' : '2 / 2　能力をえらぶ';
 }
 
-$('btn-pc-auto').addEventListener('click', () => {
-  if (deckEdit && !deckEdit.fixed) { deckEdit.pieces = autoPieces(deckEdit.available); sfx.ui(); renderDeck(); }
-});
 $('btn-pc-clear').addEventListener('click', () => {
   if (deckEdit && !deckEdit.fixed) { deckEdit.pieces = {}; sfx.ui(); renderDeck(); }
 });
@@ -3004,11 +3009,15 @@ function applyVsMode() {
   // 後手の編成を選べるのは、この端末で2人が指すときだけ
   $('gote-pick').classList.toggle('hidden', vsMode !== 'hotseat');
   $('side-label').textContent = vsMode === 'hotseat' ? '▲ 先手' : '自分';
-  $('setup-hint').innerHTML =
-    vsMode === 'cpu'     ? '相手の編成はその場でランダムに決まります。先に2勝した方の勝ち。'
+  const modeLine =
+    vsMode === 'cpu'     ? '相手の編成はその場でランダムに決まります。'
   : vsMode === 'hotseat' ? '同じ端末を渡しながら指します。両方の編成をここで選びます。'
   : vsMode === 'p2p'     ? '2台で同じ合言葉を入れます。<b>先手側が先にすすんで</b>ください。'
   :                        'serve.py で起動した端末どうしで繋ぎます。回線は使いません。';
+  // 選ぶ手がかりだけをここに置く。細かい値段は次の能力画面に出ている
+  $('setup-hint').innerHTML = modeLine
+    + '<br>持ち帰った編成は能力が<b>安い</b>(修得したものだけ)。'
+    + '既定編成は駒が固定で、能力は<b>全種</b>から選べるが値は張る。';
   if (vsMode === 'p2p') {
     $('net-url').textContent = '';
     $('net-hint').textContent = 'ブラウザ同士を直接つなぎます。離れた場所とも遊べます。';

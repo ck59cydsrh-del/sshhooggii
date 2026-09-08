@@ -1373,3 +1373,27 @@ body:has(#game:not(.hidden)),body:has(#deck:not(.hidden)){
   #deck .deck-menu .mi{padding-top:5px;padding-bottom:5px}
   #deck .deck-menu .mi-sub{display:none}
 }
+
+/* 対戦の説明で相手も選ぶので、そのぶん縦を空ける。
+   潜る側は行が3つで収まっているため、対戦のときだけ詰める */
+#brief:has(#brief-mode:not(.hidden)) .brief-lead{margin-bottom:14px}
+#brief:has(#brief-mode:not(.hidden)) .brief-line{padding:10px 2px}
+#brief:has(#brief-mode:not(.hidden)) .mode-menu .mi{padding-top:8px;padding-bottom:8px;min-height:44px}
+@media (max-height:740px){
+  #brief .screen-title{margin-bottom:12px}
+  #brief .brief-lead{font-size:13px;line-height:1.65;margin-bottom:6px}
+  #brief .brief-line{padding:5px 2px}
+  #brief .bl-text{line-height:1.6}
+  #brief .brief-stat{margin:4px 0}
+  #brief .mode-menu .mi{padding-top:4px;padding-bottom:4px;min-height:40px}
+  #brief .mode-menu .mi-sub{display:none}
+  #brief .menu .mi{padding-top:7px;padding-bottom:7px;min-height:44px}
+}
+
+/* 手順が「どの編成で」の1つだけになったので、番号の丸は置かない */
+.step-head.solo{margin-top:0}
+
+/* いま積んでいる能力。一覧が安い順なので、選んだものは下に沈む */
+.dh-chosen{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:10px;vertical-align:middle}
+.dh-chosen i{font-family:var(--mincho);font-style:normal;font-size:10px;letter-spacing:.1em;
+  color:var(--ink);border:1px solid var(--green);padding:1px 5px;line-height:1.5}

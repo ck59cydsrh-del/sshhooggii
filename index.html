@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="sshhooggii">
 <title>sshhooggii</title>
 <meta name="description" content="持ち駒が増えるほど手がつけられなくなる将棋ローグライク。">
-<link rel="stylesheet" href="style.css?v=1788826439">
+<link rel="stylesheet" href="style.css?v=1788829030">
 </head>
 <body>
 <div id="crt"></div>
@@ -107,26 +107,11 @@
 <div id="brief" class="screen hidden">
   <p class="tag" id="brief-tag">DIVE</p>
   <h2 class="screen-title" id="brief-title">潜　る</h2>
+  <div class="screen-body">
   <p class="brief-lead" id="brief-lead"></p>
   <div class="brief-lines" id="brief-lines"></div>
   <p class="brief-stat" id="brief-stat"></p>
-  <div class="menu">
-    <button id="btn-brief-go" class="mi primary"><span class="mi-no">▶</span>
-      <span class="mi-body"><b>はじめる</b><span class="mi-sub" id="brief-go-sub"></span></span>
-      <span class="mi-rule"></span><i>start</i></button>
-    <button id="btn-brief-back" class="mi"><span class="mi-no">◀</span>
-      <span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
-  </div>
-</div>
-
-<!-- ============ 対戦セットアップ ============ -->
-<div id="setup" class="screen hidden">
-  <p class="tag">versus</p>
-  <h2 class="screen-title">対戦</h2>
-
-  <div class="screen-body">
-  <!-- 手順1: 相手を選ぶ -->
-  <p class="step-head"><b>1</b>だれと</p>
+  <div id="brief-mode" class="hidden">
   <nav class="menu mode-menu" id="mode-menu">
     <button class="mi mode on" data-mode="cpu">
       <span class="mi-no">▣</span>
@@ -163,8 +148,25 @@
     <p class="net-hint" id="net-hint"></p>
   </div>
 
-  <!-- 手順2: 編成のもとを選ぶ -->
-  <p class="step-head"><b>2</b>どの編成で</p>
+  </div>
+  </div>
+  <div class="menu">
+    <button id="btn-brief-go" class="mi primary"><span class="mi-no">▶</span>
+      <span class="mi-body"><b>はじめる</b><span class="mi-sub" id="brief-go-sub"></span></span>
+      <span class="mi-rule"></span><i>start</i></button>
+    <button id="btn-brief-back" class="mi"><span class="mi-no">◀</span>
+      <span class="mi-body"><b>戻る</b></span><span class="mi-rule"></span><i>back</i></button>
+  </div>
+</div>
+
+<!-- ============ 対戦セットアップ ============ -->
+<div id="setup" class="screen hidden">
+  <p class="tag">versus</p>
+  <h2 class="screen-title">対戦</h2>
+
+  <div class="screen-body">
+  <!-- 編成のもとを選ぶ -->
+  <p class="step-head solo">どの編成で</p>
   <div class="army">
     <div class="army-head"><span class="army-side" id="side-label">自分</span><select id="sel-sente"></select></div>
     <div class="army-pieces" id="pieces-sente"></div>
@@ -204,7 +206,6 @@
       <p class="deck-head"><span>駒</span><b id="deck-piece-count">0 / 10</b></p>
       <p class="hint" id="deck-piece-hint"></p>
       <div id="deck-quick" class="deck-quick hidden">
-        <button id="btn-pc-auto" class="mini">価値の高い順に10枚</button>
         <button id="btn-pc-clear" class="mini">全部外す</button>
         <span id="deck-piece-value" class="deck-value"></span>
       </div>
@@ -381,6 +382,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js?v=1788826439"></script>
+<script src="game.js?v=1788829030"></script>
 </body>
 </html>
