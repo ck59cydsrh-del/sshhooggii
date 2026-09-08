@@ -2415,7 +2415,19 @@ function openBrief(kind, then) {
     : saved.length ? `持ち帰った編成 ${saved.length} / ${SLOTS}`
                    : 'まだ持ち帰りがないので、いまは既定編成だけで戦えます';
 }
-$('btn-brief-go').addEventListener('click', () => { sfx.ui(); const f = briefThen; briefThen = null; if (f) f(); });
+$('btn-brief-go').addEventListener('click', async () => {
+  sfx.ui();
+  // 通信対戦は、相手と繋がってから編成に進む
+  const onVersus = !$('brief-mode').classList.contains('hidden');
+  if (onVersus && (vsMode === 'p2p' || vsMode === 'net') && !net.on) {
+    const btn = $('btn-brief-go');
+    btn.classList.add('disabled');
+    const ok = await connectNet();
+    btn.classList.remove('disabled');
+    if (!ok) return;
+  }
+  const f = briefThen; briefThen = null; if (f) f();
+});
 $('btn-guide').addEventListener('click', () => { sfx.ui(); openGuide('game'); });
 $('btn-guide-back').addEventListener('click', () => {
   sfx.ui();
@@ -2486,6 +2498,47 @@ function saveToSlot(i) {
 
 let presetOpen = -1;            // いま中身を開いている枠
 
+/* 対戦用にあらかじめ組んでおいた編成。持ち帰った中身は増減しないが、
+   レア度やVS_OKを直したときに古い設定が残ることがあるので、毎回検算する */
+function validVs(p) {
+  const v = p && p.vs;
+  if (!v || !v.pieces || !v.abilities) return null;
+  if (poolTotal(v.pieces) !== DECK_PIECES) return null;
+  for (const t in v.pieces) if ((v.pieces[t] || 0) > (p.pool[t] || 0)) return null;
+  for (const id in v.abilities)
+    if (!ABI_BY_ID[id] || !VS_OK.has(id) || !p.abilities[id]) return null;
+  if (Object.keys(v.abilities).length > DECK_SLOTS) return null;
+  if (deckCost(v.abilities, true) > DECK_BUDGET + budgetBonus(p)) return null;
+  return v;
+}
+
+/* 対戦に持ち込む形を、先に決めておける。決めてあれば対戦のときは
+   そのまま出てくるので、毎回組み直さずに済む */
+function vsBlock(p) {
+  const v = validVs(p);
+  const head = `<p class="pb-head"><span>対戦の編成</span><b>${
+    v ? `駒${poolTotal(v.pieces)}枚 / 能力${Object.keys(v.abilities).length}個`
+      : 'まだ決めていない'}</b></p>`;
+  if (!v) {
+    return head
+      + `<p class="pb-note">対戦に持ち込むときは、この中から<b>駒10枚</b>と、
+         <b>能力は予算10・枠5まで</b>を選びます。持ち帰った能力の値は 並1 / 希2 / 極5。
+         ここで決めておくと、対戦のたびに組み直さずに済みます。</p>`
+      + `<button id="pb-vs-edit" class="mini">対戦の編成を決める</button>`;
+  }
+  const pieces = HAND_ORDER.filter(t => v.pieces[t])
+    .map(t => `<span class="ap"><b>${NAME[t]}</b>${v.pieces[t] > 1 ? `<i>${v.pieces[t]}</i>` : ''}</span>`).join('');
+  const abils = Object.keys(v.abilities)
+    .sort((a, b) => ABI_BY_ID[a].r - ABI_BY_ID[b].r)
+    .map(id => `<span class="ap r${ABI_BY_ID[id].r}"><b>${ABI_BY_ID[id].n}</b></span>`).join('');
+  return head
+    + `<div class="pb-pieces">${pieces}</div>`
+    + `<div class="pb-pieces pb-vs-abils">${abils || '<span class="ap-none">能力なし</span>'}</div>`
+    + `<p class="pb-note">コスト ${deckCost(v.abilities, true)} / ${DECK_BUDGET + budgetBonus(p)}。
+       対戦のときはこの形で始まり、その場で組み直すこともできます。</p>`
+    + `<button id="pb-vs-edit" class="mini">組み直す</button>`;
+}
+
 /* 編成の中身。何を持ち帰ったのかは、ここで全部見せる */
 function presetBody(p) {
   const value = HAND_ORDER.reduce((s, t) => s + VAL[t] * (p.pool[t] || 0), 0);
@@ -2521,8 +2574,7 @@ function presetBody(p) {
     <p class="pb-head"><span>能力</span><b>${ids.length}個${
       usable < ids.length ? ` / 対戦で使えるのは ${usable}個` : ''}</b></p>
     <div class="pb-abils">${rows || '<span class="ap-none">能力なし</span>'}</div>
-    <p class="pb-note">対戦に持ち込むときは、この中から<b>駒10枚</b>と、
-      <b>能力は予算10・枠5まで</b>を選びます。持ち帰った能力の値は 並1 / 希2 / 極5。</p>
+    ${vsBlock(p)}
   </div>`;
 }
 
@@ -2608,6 +2660,23 @@ function openPresets(m, savedIdx = -1, keepOpen = false) {
     nameBox.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
   }
 
+  // 対戦の形を先に決める。ここで決めた駒と能力が、対戦のときの初期値になる
+  const vsEdit = $('pb-vs-edit');
+  if (vsEdit && presetOpen >= 0 && data[presetOpen]) {
+    const idx = presetOpen;
+    vsEdit.addEventListener('click', () => {
+      sfx.ui();
+      const p = loadPresets()[idx];
+      openDeck(SENTE, { ...p, editable: true }, deck => {
+        const all = loadPresets();
+        all[idx].vs = { pieces: { ...deck.pool }, abilities: { ...deck.abilities } };
+        savePresets(all);
+        sfx.pick(1);
+        openPresets('units', -1, true);
+      }, 'presets');
+    });
+  }
+
   // 開いている編成をそのまま対戦へ(ここが本筋の合流点)
   const go = presetOpen >= 0 && data[presetOpen] ? presetOpen : -1;
   const btn = $('btn-presets-versus');
@@ -2689,6 +2758,7 @@ function pickSide(sel) {
   return p
     ? { name:p.name, pool:p.pool, abilities:p.abilities || {}, editable:true,
         score:p.score || 0, floor:p.floor || 0,      // 予算の上積みに使う
+        vs:p.vs,                                     // 先に決めてある対戦の形
         note:`潜って持ち帰った${poolTotal(p.pool)}枚から選べます` }
     : STANDARD;
 }
@@ -2740,7 +2810,7 @@ function autoAbilities(pool0, dive, budget) {
   return chosen;
 }
 
-function openDeck(side, src, next) {
+function openDeck(side, src, next, origin) {
   const dive = !!src.editable;                  // 潜って持ち帰った編成か
   const earned = {};
   for (const id in (src.abilities || {})) if (VS_OK.has(id)) earned[id] = 1;
@@ -2750,12 +2820,15 @@ function openDeck(side, src, next) {
   deckStep = 'pieces';
   const bonus = budgetBonus(src);
   deckBudget = DECK_BUDGET + bonus;
+  // 編成画面で先に決めてあれば、それを出しておく。ここから直すこともできる
+  const pre = validVs(src);
   deckEdit = {
     side, src, next, earned, dive, choosable, bonus,
+    origin: origin || 'setup',
     fixed: !dive,                               // 既定編成は駒を固定
     available: { ...src.pool },
-    pieces: dive ? autoPieces(src.pool) : { ...src.pool },
-    abilities: autoAbilities(choosable, dive, deckBudget),
+    pieces: pre ? { ...pre.pieces } : dive ? autoPieces(src.pool) : { ...src.pool },
+    abilities: pre ? { ...pre.abilities } : autoAbilities(choosable, dive, deckBudget),
   };
   ['title','game','setup','presets','brief'].forEach(id => $(id).classList.add('hidden'));
   $('deck').classList.remove('hidden');
@@ -2907,6 +2980,7 @@ $('btn-deck-auto').addEventListener('click', () => {
 });
 $('btn-deck-back').addEventListener('click', () => {
   if (deckStep === 'abils') { deckStep = 'pieces'; sfx.ui(); renderDeck(); }
+  else if (deckEdit && deckEdit.origin === 'presets') { sfx.ui(); openPresets('units', -1, true); }
   else openSetup();
 });
 $('btn-deck-ok').addEventListener('click', () => {
@@ -3035,6 +3109,11 @@ $('mode-menu').addEventListener('click', e => {
   [...$('mode-menu').children].forEach(c => c.classList.toggle('on', c === b));
   sfx.ui();
   applyVsMode();
+  // 合言葉の欄は選択肢の下にあり、選んだだけでは画面に出てこない。
+  // 入れるところまで運ぶ
+  const box = $('net-box');
+  if (!box.classList.contains('hidden'))
+    setTimeout(() => box.scrollIntoView({ block:'nearest', behavior: motionCalm ? 'auto' : 'smooth' }), 60);
 });
 
 $('sel-sente').addEventListener('change', () => { renderArmy('sel-sente','pieces-sente','abils-sente','note-sente'); sfx.ui(); });
@@ -3129,6 +3208,40 @@ function showMatchup(a, b, then) {
   setTimeout(go, 2900);            // 触らなくても進む
 }
 
+/* 相手と繋ぐ。合言葉を入れた画面(対戦の説明)から呼ぶ。
+   繋がる前に編成を組ませると、席が埋まっていたときに全部やり直しになる */
+async function connectNet() {
+  const room = ($('net-room').value || '').trim().toUpperCase();
+  if (!room) { netStatus('合言葉を入れてください。', 'bad'); return false; }
+  net.room = room; net.seat = $('net-seat').value; net.token = netToken();
+  net.mode = vsMode === 'p2p' ? 'p2p' : 'lan';
+  netStatus('つないでいます…');
+  if (net.mode === 'p2p') {
+    try {
+      await p2pConnect(room, net.seat); net.on = true;
+      netStatus(`合言葉「${room}」で繋がりました。`, 'good');
+    }
+    catch (e) {
+      const m = String(e.message);
+      netStatus(
+        m === 'room-taken' ? 'その合言葉は先手側が使っています。後手を選んでください。'
+        : m === 'no-host'  ? '先手側が見つかりません。先に先手側ですすんでください。'
+        : m === 'peerjs-missing' ? '通信部品を読み込めませんでした。'
+        : '繋がりませんでした。合言葉と回線を確認してください。', 'bad');
+      return false;
+    }
+  } else {
+    try {
+      const r = await netCall(`/api/join?room=${encodeURIComponent(room)}&seat=${net.seat}&token=${net.token}`);
+      if (!r.ok) { netStatus('その席は相手が使っています。', 'bad'); return false; }
+      net.on = true; net.since = r.count || 0;
+      netStatus(`部屋「${room}」に入りました。`, 'good');
+      netPoll();
+    } catch (e) { netStatus('中継所に届きません。serve.py で起動してください。', 'bad'); return false; }
+  }
+  return true;
+}
+
 $('btn-setup-start').addEventListener('click', async () => {
   const srcS = pickSide($('sel-sente'));
   const srcG = vsMode === 'hotseat' ? pickSide($('sel-gote')) : null;
@@ -3150,31 +3263,7 @@ $('btn-setup-start').addEventListener('click', async () => {
   };
 
   if (vsMode === 'p2p' || vsMode === 'net') {
-    const room = ($('net-room').value || '').trim().toUpperCase();
-    if (!room) { netStatus('合言葉を入れてください。', 'bad'); return; }
-    net.room = room; net.seat = $('net-seat').value; net.token = netToken();
-    net.mode = vsMode === 'p2p' ? 'p2p' : 'lan';
-    netStatus('つないでいます…');
-    if (net.mode === 'p2p') {
-      try { await p2pConnect(room, net.seat); net.on = true; }
-      catch (e) {
-        const m = String(e.message);
-        netStatus(
-          m === 'room-taken' ? 'その合言葉は先手側が使っています。後手を選んでください。'
-          : m === 'no-host'  ? '先手側が見つかりません。先に先手側ですすんでください。'
-          : m === 'peerjs-missing' ? '通信部品を読み込めませんでした。'
-          : '繋がりませんでした。合言葉と回線を確認してください。', 'bad');
-        return;
-      }
-    } else {
-      try {
-        const r = await netCall(`/api/join?room=${encodeURIComponent(room)}&seat=${net.seat}&token=${net.token}`);
-        if (!r.ok) { netStatus('その席は相手が使っています。', 'bad'); return; }
-        net.on = true; net.since = r.count || 0;
-        netStatus(`部屋「${room}」に入りました。`, 'good');
-        netPoll();
-      } catch (e) { netStatus('中継所に届きません。serve.py で起動してください。', 'bad'); return; }
-    }
+    if (!net.on && !(await connectNet())) return;
   } else { net.on = false; net.mode = 'lan'; }
 
   // 通信対戦は自分の側だけ組み、相手の編成は受け取る

@@ -1397,3 +1397,10 @@ body:has(#game:not(.hidden)),body:has(#deck:not(.hidden)){
 .dh-chosen{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:10px;vertical-align:middle}
 .dh-chosen i{font-family:var(--mincho);font-style:normal;font-size:10px;letter-spacing:.1em;
   color:var(--ink);border:1px solid var(--green);padding:1px 5px;line-height:1.5}
+
+/* 対戦の編成(先に決めておいたもの)。能力はレア度で色を変える */
+.pb-vs-abils{margin-top:6px}
+.pb-vs-abils .ap.r2{border-color:var(--green)}
+.pb-vs-abils .ap.r3{border-color:var(--ink);background:var(--ink)}
+.pb-vs-abils .ap.r3 b{color:var(--paper)}
+#pb-vs-edit{margin-top:10px;min-height:40px}
