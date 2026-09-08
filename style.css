@@ -1311,9 +1311,65 @@ body.calm .pc.flyer{display:none}
 
 /* 対局中は下の余白を詰め、空いたぶんを盤に渡す。
    64pxの余白のせいで盤が197pxまで痩せ、1マスが39pxしかなかった */
-body:has(#game:not(.hidden)){
+body:has(#game:not(.hidden)),body:has(#deck:not(.hidden)){
   padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 12px));
 }
 
 /* 音を切ったままなのを、タイトルでも分かるようにする */
 .mi.muted-note .mi-sub{color:var(--ink)}
+
+/* 編成画面は「選ぶ場所」がいちばん狭かった。実測では画面812pxのうち
+   見出しと固定部とボタンで336pxを使い、選ぶ枠は192px(能力なら2件分)
+   しか残っていなかった。周りを削ってリストに回す */
+#deck .screen-title{margin-bottom:14px}
+#deck #deck-title{gap:4px;font-size:22px}
+#deck .dt-name{font-size:19px}
+#deck .deck-step{margin:-10px 0 10px}
+#deck .hint{line-height:1.7;margin-bottom:10px}
+#deck .deck-quick{margin-bottom:8px}
+#deck .deck-head{margin-bottom:6px}
+#deck .deck-menu{margin-top:8px}
+#deck .deck-menu .mi{padding-top:9px;padding-bottom:9px}
+#deck .deck-menu .mi-sub{line-height:1.5}
+
+/* 能力は23件×98pxに対して見える枠が295px(実測3件)しかなく、ひたすら
+   スクロールする画面になっていた。固定部・カード・ボタンの三方を詰める */
+#deck .deck-filter{gap:4px;margin-bottom:8px}
+#deck .fchip{padding:5px 8px;letter-spacing:.08em}
+#deck .deck-meter{margin-bottom:8px}
+#deck .deck-ab{padding:8px 2px}
+#deck .da-head{margin-bottom:1px}
+#deck .da-desc{line-height:1.6;margin-top:2px}
+#deck .deck-ab .ac-diag{width:40px;height:40px}
+/* 縦に4段(分類・名前・読み・説明)積むと1件87pxになり、23件が4件ずつ
+   しか見えなかった。1行目に分類と名前と読みを並べ、説明を次行に落とす */
+#deck .da-main{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+#deck .da-head{margin-bottom:0}
+#deck .da-desc{flex:0 0 100%;margin-top:1px}
+#deck .da-main b{line-height:1.3}
+/* 見出しとボタンからもう一声。ここが減った分だけ一覧が伸びる */
+#deck .deck-menu .mi{padding-top:7px;padding-bottom:7px;min-height:44px}  /* 詰めてもタップは44pxを割らない */
+/* 駒は7種で385px。あと28pxで全部が一度に見えるので、行の余白だけ削る
+   (−＋のボタンは44x40pxのまま触らない) */
+#deck .deck-piece{padding:5px 0}
+#deck .deck-menu .mi-sub{font-size:9.5px}
+#deck .deck-tag{margin-bottom:2px}
+
+/* 背の低い端末。812pxでは全部見えていた駒7行が、667pxでは4行まで
+   落ちる(実測145pxはみ出し)。見出しと固定部をもう一段削って戻す */
+@media (max-height:740px){
+  #deck .screen-title{margin-bottom:8px}
+  #deck #deck-title{font-size:19px;gap:2px}
+  #deck .dt-name{font-size:17px}
+  #deck .dt-side{font-size:12px}
+  #deck .deck-step{margin:-8px 0 6px}
+  #deck .hint{margin-bottom:6px;line-height:1.5}
+  #deck .deck-quick{margin-bottom:6px}
+  #deck .deck-meter{margin-bottom:6px}
+  #deck .deck-filter{margin-bottom:6px}
+  #deck .deck-piece{padding:3px 0}
+  #deck .deck-ab{padding:6px 2px}
+  #deck .deck-menu{margin-top:4px}
+  #deck .deck-menu .mi{padding-top:5px;padding-bottom:5px}
+  #deck .deck-menu .mi-sub{display:none}
+}
